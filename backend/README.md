@@ -20,7 +20,7 @@ Modular, production-ready asynchronous Python API built using **FastAPI**, **Pyd
 Ensure Python 3.9+ is installed, create a virtual environment, and install dependencies:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: .\venv\Scripts\activate
+.\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
