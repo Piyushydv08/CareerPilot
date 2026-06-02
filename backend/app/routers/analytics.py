@@ -18,20 +18,22 @@ except Exception:
     logger.warning("Spacy 'en_core_web_sm' model not found locally.")
     nlp = None
 
+
 @router.get("/trends", response_model=TrendAnalyticsResponse)
 async def get_market_trends(domain: str = Query(..., description="Target domain query, e.g. Full Stack Developer")):
     """
-    Analytics collection layer. Pulls real-time job market postings from the Adzuna API, 
+    Analytics collection layer. Pulls real-time job market postings from the Adzuna API,
     processes textual descriptors with NLP, normalizes bounds using Pandas, and emits
     metrics strictly formatted for frontend Recharts consumption.
     """
     logger.info(f"Fetching job analytics for domain: {domain}")
-    
+
     app_id = os.environ.get("ADZUNA_APP_ID")
     app_key = os.environ.get("ADZUNA_APP_KEY")
-    
+
     jobs_data = []
-    
+    is_mock_data = False
+
     # 1. Pull real-time job market postings from the Adzuna API
     if app_id and app_key:
         try:
@@ -43,16 +45,22 @@ async def get_market_trends(domain: str = Query(..., description="Target domain 
                 "what": domain,
                 "content-type": "application/json"
             }
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(url, params=params)
-                response.raise_for_status()
-                data = response.json()
-                jobs_data = data.get("results", [])
+                if response.status_code == 200:
+                    data = response.json()
+                    jobs_data = data.get("results", [])
+                    logger.info(f"Adzuna returned {len(jobs_data)} jobs for domain: {domain}")
+                else:
+                    logger.warning(f"Adzuna API returned non-200 status: {response.status_code}. Falling back to mock data.")
+                    is_mock_data = True
         except Exception as e:
             logger.error(f"Adzuna API request failed: {e}")
-            
+            is_mock_data = True
+
     # Mock data fallback for development if API credentials are not provisioned
     if not jobs_data:
+        is_mock_data = True
         logger.info("Falling back to local generated mock data for Pandas analysis.")
         jobs_data = [
             {"title": f"Senior {domain}", "description": "Looking for React, Node.js and TypeScript experts. Fully remote setup.", "salary_min": 120000, "salary_max": 160000, "location": {"display_name": "San Francisco, CA"}},
@@ -64,48 +72,48 @@ async def get_market_trends(domain: str = Query(..., description="Target domain 
 
     # 2. Ingest raw job records into a Pandas DataFrame
     df = pd.DataFrame(jobs_data)
-    
+
     # 3. Clean and format data fields
     df['title'] = df['title'].astype(str).str.title()
     df['description'] = df['description'].astype(str).str.lower()
-    
+
     if 'salary_min' not in df.columns:
         df['salary_min'] = pd.NA
     if 'salary_max' not in df.columns:
         df['salary_max'] = pd.NA
-        
+
     # Coerce salaries to numerical limits
     df['salary_min'] = pd.to_numeric(df['salary_min'], errors='coerce')
     df['salary_max'] = pd.to_numeric(df['salary_max'], errors='coerce')
-    
+
     # Resolve empty or missing salary distributions by computing standard median values
     global_median_min = df['salary_min'].median(skipna=True)
     global_median_max = df['salary_max'].median(skipna=True)
-    
+
     # Safe fallback if entirely NaNs
     if pd.isna(global_median_min): global_median_min = 90000
     if pd.isna(global_median_max): global_median_max = 130000
-        
+
     df['salary_min'] = df['salary_min'].fillna(global_median_min)
     df['salary_max'] = df['salary_max'].fillna(global_median_max)
-    
+
     # Compute true localized average
     df['avg_salary'] = (df['salary_min'] + df['salary_max']) / 2
-    
+
     # Handle Outliers (drop bottom 5% and top 5%)
     q_low = df["avg_salary"].quantile(0.05)
     q_hi  = df["avg_salary"].quantile(0.95)
     df_filtered = df[(df["avg_salary"] >= q_low) & (df["avg_salary"] <= q_hi)]
-    
+
     if df_filtered.empty:
-        df_filtered = df # Safety fallback
-        
+        df_filtered = df  # Safety fallback
+
     total_live_jobs = len(df_filtered)
     overall_avg_salary = int(df_filtered['avg_salary'].mean())
-    
+
     # 4. Implement text processing with spaCy to extract recurring skill keywords
     all_text = " ".join(df_filtered['description'].tolist())
-    
+
     technical_skills = []
     if nlp:
         # Accommodate large concatenated text block limitations
@@ -122,11 +130,11 @@ async def get_market_trends(domain: str = Query(..., description="Target domain 
         for word in all_text.split():
             if len(word) > 3 and word.isalpha():
                 technical_skills.append(word.title())
-                
+
     # 5. Calculate counts for every top skill & isolate remote-work markers
     skill_counts = Counter(technical_skills)
     top_skills = skill_counts.most_common(7)
-    
+
     skills_demand = []
     for skill, count in top_skills:
         skills_demand.append(
@@ -136,19 +144,23 @@ async def get_market_trends(domain: str = Query(..., description="Target domain 
                 percentage=int((count / len(technical_skills)) * 100) if len(technical_skills) > 0 else 0
             )
         )
-        
-    # Remote vs Hybrid vs Onsite isolation logic using Pandas vectorization
-    remote_count = int(df_filtered['description'].str.contains('remote', case=False, na=False).sum())
-    hybrid_count = int(df_filtered['description'].str.contains('hybrid', case=False, na=False).sum())
-    onsite_count = total_live_jobs - (remote_count + hybrid_count)
-    if onsite_count < 0: onsite_count = 0
-        
+
+    # Remote vs Hybrid vs Onsite — mutually exclusive classification
+    # Priority: remote > hybrid > onsite (a job can only be in one bucket)
+    remote_mask = df_filtered['description'].str.contains('remote', case=False, na=False)
+    hybrid_mask = df_filtered['description'].str.contains('hybrid', case=False, na=False) & ~remote_mask
+    onsite_mask = ~remote_mask & ~hybrid_mask
+
+    remote_count = int(remote_mask.sum())
+    hybrid_count = int(hybrid_mask.sum())
+    onsite_count = int(onsite_mask.sum())
+
     work_model_ratio = {
         "Remote": int((remote_count / total_live_jobs) * 100) if total_live_jobs > 0 else 0,
         "Hybrid": int((hybrid_count / total_live_jobs) * 100) if total_live_jobs > 0 else 0,
         "Onsite": int((onsite_count / total_live_jobs) * 100) if total_live_jobs > 0 else 0
     }
-    
+
     # Group average salary bounds into clear data bands (Junior, Mid, Senior)
     salaries = [
         SalaryDistributionItem(
@@ -168,15 +180,16 @@ async def get_market_trends(domain: str = Query(..., description="Target domain 
         )
     ]
 
-    # 6. Export the summarized data structure into clean Recharts-optimized JSON 
+    # 6. Export the summarized data structure into clean Recharts-optimized JSON
     response_data = TrendAnalyticsResponse(
-        total_live_jobs=total_live_jobs * 23, # Inflated dynamic multiplier for dashboard aesthetics
+        total_live_jobs=total_live_jobs,  # Real count — no artificial multiplier
         avg_salary=overall_avg_salary,
         top_sector=domain.title(),
         top_sector_reqs=f"{top_skills[0][0] if top_skills else 'Software'} / {top_skills[1][0] if len(top_skills) > 1 else 'Cloud'}",
         skills_demand=skills_demand,
         work_model_ratio=work_model_ratio,
-        salaries=salaries
+        salaries=salaries,
+        is_mock_data=is_mock_data
     )
-    
+
     return response_data

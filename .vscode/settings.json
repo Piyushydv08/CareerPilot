@@ -1,0 +1,11 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\SUBRO\\OneDrive\\Desktop\\CareerPilot\\backend\\venv\\Scripts\\python.exe",
+  "python.analysis.extraPaths": [
+    "C:\\Users\\SUBRO\\OneDrive\\Desktop\\CareerPilot\\backend"
+  ],
+  "python.analysis.venvPath": "C:\\Users\\SUBRO\\OneDrive\\Desktop\\CareerPilot\\backend",
+  "python.venvPath": "C:\\Users\\SUBRO\\OneDrive\\Desktop\\CareerPilot\\backend",
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  }
+}

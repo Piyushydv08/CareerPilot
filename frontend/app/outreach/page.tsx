@@ -14,9 +14,13 @@ import {
   TrendingUp,
   RotateCcw,
   BadgeAlert,
-  Loader
+  Loader,
+  Building,
+  Wand2
 } from "lucide-react";
 import { useProject } from "../context/ProjectContext";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 interface OutreachContact {
   id: string;
@@ -28,14 +32,19 @@ interface OutreachContact {
 }
 
 export default function OutreachPage() {
-  const { matchScore } = useProject();
-  const [selectedTemplate, setSelectedTemplate] = useState("stripe_frontend");
+  const { matchScore, resumeData } = useProject();
   const [copied, setCopied] = useState(false);
   const [emailSubject, setEmailSubject] = useState("Sr. Frontend Engineer - Profile Telemetry Alignment");
   const [emailBody, setEmailBody] = useState(
     `Hi Recruiter,\n\nI recently synthesized my technical roadmap against Stripe's senior frontend engineering profile and indexed an 88% structural compatibility score.\n\nHaving built scalable microservices state engines in TypeScript and React at Stripe contractor teams previously, I'd love to connect regarding technical loops in Stripe regional networks.\n\nMy indexed report details are compiled here: careerpilot.ai/share/piyus_stripe\n\nBest,\nPiyush Sharma`
   );
-  
+
+  // AI Generator state
+  const [targetCompany, setTargetCompany] = useState("");
+  const [targetRole, setTargetRole] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
   const [contacts, setContacts] = useState<OutreachContact[]>([
     { id: "c1", name: "Sarah Connor", role: "Principal Talent Executive", company: "Stripe", status: "PENDING", lastActive: "10m ago" },
     { id: "c2", name: "David Miller", role: "Engineering Lead", company: "Stripe", status: "DISPATCHED", lastActive: "1h ago" },
@@ -45,26 +54,44 @@ export default function OutreachPage() {
 
   const [isSending, setIsSending] = useState(false);
 
-  // Email Templates
-  const templates = {
-    stripe_frontend: {
-      subject: "Sr. Frontend Engineer - Profile Telemetry Alignment",
-      body: `Hi Recruiter,\n\nI recently synthesized my technical roadmap against Stripe's senior frontend engineering profile and indexed an 88% structural compatibility score.\n\nHaving built scalable microservices state engines in TypeScript and React at Stripe contractor teams previously, I'd love to connect regarding technical loops in Stripe regional networks.\n\nMy indexed report details are compiled here: careerpilot.ai/share/piyus_stripe\n\nBest,\nPiyush Sharma`
-    },
-    netflix_frontend: {
-      subject: "UI Architect Opportunities - High Match Telemetry",
-      body: `Hi Talent Team,\n\nMy profile has indexed a 92% compatibility score with Netflix's core UI Architecture specifications.\n\nWith extensive experience in React rendering pipelines, memoization performance audits, and high-contrast aesthetic designs, I am highly interested in contributing to Netflix streaming clients.\n\nFull assessment rubric shareable link: careerpilot.ai/share/piyus_netflix\n\nRegards,\nPiyush Sharma`
-    },
-    generic_tech: {
-      subject: "Technical Engineering Profile Telemetry - Piyush Sharma",
-      body: `Dear Engineering Lead,\n\nI am reaching out regarding Senior Frontend Engineer reqs. My profile has successfully parsed an overall match index of ${matchScore}% across modern TypeScript/React benchmarks.\n\nI would welcome the opportunity to outline my work in micro-interactions and high-performance frontend state structures.\n\nReview my AI assessment results here: careerpilot.ai/share/piyus\n\nSincerely,\nPiyush Sharma`
+  const handleGenerateWithAI = async () => {
+    if (!targetCompany.trim() || !targetRole.trim()) {
+      setGenerateError("Please enter both company name and target role.");
+      return;
     }
-  };
 
-  const handleSelectTemplate = (key: keyof typeof templates) => {
-    setSelectedTemplate(key);
-    setEmailSubject(templates[key].subject);
-    setEmailBody(templates[key].body);
+    setIsGenerating(true);
+    setGenerateError(null);
+
+    try {
+      const candidateName = resumeData?.name || "Candidate";
+      const candidateSkills = resumeData?.skills.map(s => s.name) || [];
+
+      const response = await fetch(`${BASE_URL}/outreach/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidate_name: candidateName,
+          candidate_skills: candidateSkills,
+          target_company: targetCompany,
+          target_role: targetRole,
+          match_score: matchScore
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setEmailSubject(data.subject);
+        setEmailBody(data.body);
+      } else {
+        setGenerateError("AI generation failed. Please try again.");
+      }
+    } catch (e) {
+      console.error("Outreach generation failed:", e);
+      setGenerateError("Could not reach the AI backend. Check your connection.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleCopy = () => {
@@ -75,6 +102,8 @@ export default function OutreachPage() {
 
   const handleDispatchOutreach = async (contactId: string) => {
     setIsSending(true);
+    // Copy email to clipboard on dispatch
+    navigator.clipboard.writeText(`Subject: ${emailSubject}\n\n${emailBody}`);
     await new Promise(resolve => setTimeout(resolve, 1000));
     setContacts(prev => prev.map(c => {
       if (c.id === contactId) {
@@ -101,45 +130,65 @@ export default function OutreachPage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Left Side: Sequence Builder (Spans 7 cols) */}
         <div className="lg:col-span-7 flex flex-col gap-6">
+
+          {/* AI Generator Form */}
+          <div className="bento-card rounded-lg p-6 flex flex-col gap-4">
+            <div className="flex items-center gap-2 border-b border-outline-variant/60 pb-4">
+              <Wand2 className="h-4.5 w-4.5 text-cyber-blue animate-pulse" />
+              <h3 className="font-mono text-xs font-bold text-white uppercase tracking-wider">Generate with AI</h3>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
+                  Target Company
+                </label>
+                <input
+                  type="text"
+                  value={targetCompany}
+                  onChange={e => setTargetCompany(e.target.value)}
+                  placeholder="e.g. Stripe"
+                  className="w-full bg-[#07070a]/60 border border-outline-variant rounded p-2.5 text-white focus:outline-none focus:border-cyber-blue transition-colors font-sans text-xs"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider font-semibold">
+                  Target Role
+                </label>
+                <input
+                  type="text"
+                  value={targetRole}
+                  onChange={e => setTargetRole(e.target.value)}
+                  placeholder="e.g. Senior Frontend Engineer"
+                  className="w-full bg-[#07070a]/60 border border-outline-variant rounded p-2.5 text-white focus:outline-none focus:border-cyber-blue transition-colors font-sans text-xs"
+                />
+              </div>
+            </div>
+
+            {generateError && (
+              <p className="font-mono text-[10px] text-red-400">{generateError}</p>
+            )}
+
+            <button
+              onClick={handleGenerateWithAI}
+              disabled={isGenerating}
+              className="w-full py-2.5 rounded bg-cyber-blue text-black font-mono text-xs font-bold uppercase tracking-wider hover:bg-white hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <><Loader className="h-4 w-4 animate-spin" /><span>Generating...</span></>
+              ) : (
+                <><Sparkles className="h-4 w-4" /><span>Generate Email with AI</span></>
+              )}
+            </button>
+          </div>
+
+          {/* Email Compiler */}
           <div className="bento-card rounded-lg p-6 flex flex-col gap-6">
             <div className="flex justify-between items-center border-b border-outline-variant/60 pb-4">
               <h3 className="font-mono text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="h-4.5 w-4.5 text-cyber-blue animate-pulse" />
                 <span>AI Sequence compiler</span>
               </h3>
-              
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => handleSelectTemplate("stripe_frontend")}
-                  className={`px-3 py-1 font-mono text-[9px] uppercase tracking-wider rounded border ${
-                    selectedTemplate === "stripe_frontend" 
-                      ? "border-cyber-blue bg-cyber-blue/10 text-cyber-blue" 
-                      : "border-outline-variant text-on-surface-variant hover:text-white"
-                  }`}
-                >
-                  Stripe
-                </button>
-                <button 
-                  onClick={() => handleSelectTemplate("netflix_frontend")}
-                  className={`px-3 py-1 font-mono text-[9px] uppercase tracking-wider rounded border ${
-                    selectedTemplate === "netflix_frontend" 
-                      ? "border-cyber-blue bg-cyber-blue/10 text-cyber-blue" 
-                      : "border-outline-variant text-on-surface-variant hover:text-white"
-                  }`}
-                >
-                  Netflix
-                </button>
-                <button 
-                  onClick={() => handleSelectTemplate("generic_tech")}
-                  className={`px-3 py-1 font-mono text-[9px] uppercase tracking-wider rounded border ${
-                    selectedTemplate === "generic_tech" 
-                      ? "border-cyber-blue bg-cyber-blue/10 text-cyber-blue" 
-                      : "border-outline-variant text-on-surface-variant hover:text-white"
-                  }`}
-                >
-                  AI Match
-                </button>
-              </div>
             </div>
 
             {/* Fields edit */}
@@ -176,13 +225,9 @@ export default function OutreachPage() {
                 className="px-4 py-2 bg-white text-black hover:bg-cyber-blue hover:text-black font-mono text-xs font-bold uppercase tracking-wider rounded transition-all flex items-center gap-2 cursor-pointer hover:shadow-[0_0_10px_rgba(0,210,255,0.4)]"
               >
                 {copied ? (
-                  <>
-                    <Check className="h-4.5 w-4.5" /> Copied!
-                  </>
+                  <><Check className="h-4.5 w-4.5" /> Copied!</>
                 ) : (
-                  <>
-                    <Copy className="h-4.5 w-4.5" /> Copy Sequence
-                  </>
+                  <><Copy className="h-4.5 w-4.5" /> Copy Sequence</>
                 )}
               </button>
             </div>

@@ -12,7 +12,8 @@ import {
   Settings, 
   HelpCircle,
   Sparkles,
-  Compass
+  Compass,
+  BarChart2
 } from "lucide-react";
 
 export const Sidebar: React.FC = () => {
@@ -24,6 +25,7 @@ export const Sidebar: React.FC = () => {
     { name: "Simulator", href: "/simulator", icon: BrainCircuit },
     { name: "Interview", href: "/interview", icon: MessageSquareCode },
     { name: "Outreach", href: "/outreach", icon: SendHorizontal },
+    { name: "Analytics", href: "/analytics", icon: BarChart2 },
   ];
 
   return (

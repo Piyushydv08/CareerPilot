@@ -6,8 +6,8 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.core.database import db_manager
-from app.routers import resume, match, interview, analytics
+from app.core.database import db_manager, setup_collections
+from app.routers import resume, match, interview, analytics, outreach
 
 # --- Setup Global Logging Stream ---
 logging.basicConfig(
@@ -22,6 +22,8 @@ logger = logging.getLogger("app.main")
 async def lifespan(app: FastAPI):
     # Connect to MongoDB Atlas asynchronously on startup
     await db_manager.connect_to_database()
+    # Create collection indexes and verify vector search index
+    await setup_collections()
     yield
     # Safely release db connections on shutdown
     await db_manager.close_database_connection()
@@ -50,10 +52,10 @@ app.add_middleware(
 async def profile_request_telemetry(request: Request, call_next):
     start_time = time.time()
     client_ip = request.client.host if request.client else "unknown"
-    
+
     # Process route request
     response: Response = await call_next(request)
-    
+
     process_duration_ms = (time.time() - start_time) * 1000
     logger.info(
         f"Client IP: {client_ip} | Method: {request.method} | "
@@ -83,6 +85,7 @@ app.include_router(resume.router, prefix=settings.API_V1_STR)
 app.include_router(match.router, prefix=settings.API_V1_STR)
 app.include_router(interview.router, prefix=settings.API_V1_STR)
 app.include_router(analytics.router, prefix=settings.API_V1_STR)
+app.include_router(outreach.router, prefix=settings.API_V1_STR)
 
 @app.get("/", tags=["health"])
 async def check_api_health():

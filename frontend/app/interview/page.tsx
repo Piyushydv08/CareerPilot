@@ -20,16 +20,32 @@ import {
   Play,
   RotateCcw,
   Sparkles,
-  Radar
+  Radar,
+  Loader
 } from "lucide-react";
 import { useProject, ChatMessage } from "../context/ProjectContext";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
+interface AssessmentData {
+  overall_score: number;
+  technical_score: number;
+  communication_score: number;
+  strengths: string[];
+  weaknesses: string[];
+  verdict: string;
+}
 
 export default function InterviewPage() {
   const { 
     messages, 
     sendInterviewMessage, 
     resetInterview,
-    matchScore
+    matchScore,
+    resumeData,
+    jobDescription,
+    startInterviewSession,
+    sessionId
   } = useProject();
 
   const [isEnded, setIsEnded] = useState(false);
@@ -37,6 +53,9 @@ export default function InterviewPage() {
   const [isThinking, setIsThinking] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(863); // Starts at 14:23
   const [countUpMatch, setCountUpMatch] = useState(0);
+  const [isAssessing, setIsAssessing] = useState(false);
+  const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
+  const [sessionStarted, setSessionStarted] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -55,6 +74,14 @@ export default function InterviewPage() {
     return () => clearInterval(timer);
   }, [isEnded]);
 
+  // Start interview session on mount if not already started
+  useEffect(() => {
+    if (!sessionStarted && resumeData) {
+      setSessionStarted(true);
+      startInterviewSession(jobDescription).catch(console.error);
+    }
+  }, [resumeData]);
+
   // Format Elapsed Time
   const formatTimer = () => {
     const mins = Math.floor(timerSeconds / 60);
@@ -63,24 +90,60 @@ export default function InterviewPage() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
   };
 
-  // Trigger End of Session & Assessment Count-up
-  const handleEndSession = () => {
+  // Trigger End of Session — calls /interview/assess for real rubric
+  const handleEndSession = async () => {
     setIsEnded(true);
-    // Count up animation for report
-    setCountUpMatch(0);
-    setTimeout(() => {
-      const target = 88;
-      const stepTime = Math.floor(1500 / target);
-      let current = 0;
-      const countInterval = setInterval(() => {
-        current += 1;
-        setCountUpMatch(current);
-        if (current >= target) {
-          clearInterval(countInterval);
-          setCountUpMatch(target);
-        }
-      }, stepTime);
-    }, 200);
+    setIsAssessing(true);
+
+    try {
+      const response = await fetch(`${BASE_URL}/interview/assess`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_history: messages })
+      });
+
+      if (response.ok) {
+        const data: AssessmentData = await response.json();
+        setAssessmentData(data);
+
+        // Count up animation to real score
+        setCountUpMatch(0);
+        setTimeout(() => {
+          const target = data.overall_score;
+          const stepTime = Math.max(10, Math.floor(1500 / target));
+          let current = 0;
+          const countInterval = setInterval(() => {
+            current += 1;
+            setCountUpMatch(current);
+            if (current >= target) {
+              clearInterval(countInterval);
+              setCountUpMatch(target);
+            }
+          }, stepTime);
+        }, 200);
+      } else {
+        throw new Error("Assessment API failed");
+      }
+    } catch (e) {
+      console.error("Assessment failed, using fallback score", e);
+      // Fallback with context matchScore
+      const target = matchScore || 75;
+      setCountUpMatch(0);
+      setTimeout(() => {
+        const stepTime = Math.max(10, Math.floor(1500 / target));
+        let current = 0;
+        const countInterval = setInterval(() => {
+          current += 1;
+          setCountUpMatch(current);
+          if (current >= target) {
+            clearInterval(countInterval);
+            setCountUpMatch(target);
+          }
+        }, stepTime);
+      }, 200);
+    } finally {
+      setIsAssessing(false);
+    }
   };
 
   // Textarea input auto-grow
@@ -115,6 +178,9 @@ export default function InterviewPage() {
     resetInterview();
     setIsEnded(false);
     setTimerSeconds(863);
+    setAssessmentData(null);
+    setCountUpMatch(0);
+    setSessionStarted(false);
   };
 
   return (
@@ -195,10 +261,14 @@ export default function InterviewPage() {
             <div className="shrink-0 pt-4 border-t border-outline-variant/60">
               <button 
                 onClick={handleEndSession}
-                className="w-full bg-red-950/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-black hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] transition-all duration-300 py-3 rounded font-mono text-[10px] uppercase tracking-wider font-bold flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isAssessing}
+                className="w-full bg-red-950/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-black hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] transition-all duration-300 py-3 rounded font-mono text-[10px] uppercase tracking-wider font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <StopCircle className="h-4.5 w-4.5" />
-                <span>End &amp; Get Rubric</span>
+                {isAssessing ? (
+                  <><Loader className="h-4.5 w-4.5 animate-spin" /><span>Assessing...</span></>
+                ) : (
+                  <><StopCircle className="h-4.5 w-4.5" /><span>End &amp; Get Rubric</span></>
+                )}
               </button>
             </div>
           </aside>
@@ -326,7 +396,9 @@ export default function InterviewPage() {
               <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
                 Senior Frontend Engineer Assessment Report <Sparkles className="h-5.5 w-5.5 text-cyber-blue" />
               </h2>
-              <p className="text-xs text-on-surface-variant font-mono mt-1">Generated telemetry report on October 24, 2023.</p>
+              <p className="text-xs text-on-surface-variant font-mono mt-1">
+                {assessmentData ? assessmentData.verdict : "AI assessment report generated."}
+              </p>
             </div>
             <div className="flex gap-3">
               <button 
@@ -365,7 +437,7 @@ export default function InterviewPage() {
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
-                Exceeds benchmark baseline criteria by 14%.
+                {assessmentData ? `Technical: ${assessmentData.technical_score}%` : "Exceeds benchmark baseline criteria by 14%."}
               </p>
             </div>
 
@@ -377,14 +449,14 @@ export default function InterviewPage() {
               <h3 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest mb-4 font-semibold">Communication Clarity</h3>
               <div className="flex items-baseline gap-1 mb-2 font-mono">
                 <span className="text-5xl font-bold text-white tracking-tighter">
-                  {countUpMatch > 0 ? Math.round(countUpMatch * 1.045) : 0}
+                  {assessmentData ? assessmentData.communication_score : (countUpMatch > 0 ? Math.round(countUpMatch * 1.045) : 0)}
                 </span>
                 <span className="text-lg text-on-surface-variant font-bold">/100</span>
               </div>
               <div className="w-full bg-surface-dim h-1.5 rounded-full mt-4 overflow-hidden border border-outline-variant/30">
                 <div 
                   className="bg-white h-full rounded-full transition-all duration-1000"
-                  style={{ width: "92%" }}
+                  style={{ width: `${assessmentData ? assessmentData.communication_score : 92}%` }}
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
@@ -400,14 +472,14 @@ export default function InterviewPage() {
               <h3 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest mb-4 font-semibold">Technical Depth</h3>
               <div className="flex items-baseline gap-1 mb-2 font-mono">
                 <span className="text-5xl font-bold text-white tracking-tighter">
-                  {countUpMatch > 0 ? Math.round(countUpMatch * 0.886) : 0}
+                  {assessmentData ? assessmentData.technical_score : (countUpMatch > 0 ? Math.round(countUpMatch * 0.886) : 0)}
                 </span>
                 <span className="text-lg text-on-surface-variant font-bold">/100</span>
               </div>
               <div className="w-full bg-surface-dim h-1.5 rounded-full mt-4 overflow-hidden border border-outline-variant/30">
                 <div 
                   className="bg-[#20202c] h-full rounded-full transition-all duration-1000"
-                  style={{ width: "78%" }}
+                  style={{ width: `${assessmentData ? assessmentData.technical_score : 78}%` }}
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
@@ -434,32 +506,29 @@ export default function InterviewPage() {
                 <div className="animate-fade-slide-up">
                   <h4 className="font-sans text-base font-bold text-white mb-2">Executive Summary</h4>
                   <p className="text-on-surface-variant leading-relaxed">
-                    The candidate demonstrated a robust understanding of modern React paradigms and component architecture. They successfully navigated the architectural design questions, showing a preference for composition over inheritance and highlighting the importance of memoization in large-scale applications.
+                    {assessmentData?.strengths.join(" ") || 
+                      "The candidate demonstrated a robust understanding of modern React paradigms and component architecture. They successfully navigated the architectural design questions, showing a preference for composition over inheritance and highlighting the importance of memoization in large-scale applications."}
                   </p>
                 </div>
 
                 <div className="animate-fade-slide-up" style={{ animationDelay: "150ms" }}>
-                  <h4 className="font-sans text-base font-bold text-white mb-2">Technical Deep-Dive</h4>
-                  <p className="text-on-surface-variant leading-relaxed mb-3">
-                    When asked about managing complex state across deeply nested components, the candidate immediately identified Context API and state management libraries like Redux or Zustand. Their explanation of <code className="font-mono bg-surface-dim px-1.5 py-0.5 rounded border border-outline-variant text-cyber-blue">useReducer</code> combined with Context was textbook.
-                  </p>
+                  <h4 className="font-sans text-base font-bold text-white mb-2">AI Assessment Verdict</h4>
                   <p className="text-on-surface-variant leading-relaxed">
-                    However, during the performance optimization segment, the response lacked empirical depth. The candidate stated:
-                    <span className="font-mono text-xs text-cyber-blue block my-2 p-3 bg-surface-dim rounded border border-cyber-blue/15 shadow-sm leading-normal">
-                      &quot;I would use useMemo and useCallback everywhere to prevent re-renders.&quot;
-                    </span>
-                    This indicates a common anti-pattern. <strong className="text-white">Over-memoization</strong> can lead to worse performance due to the overhead of dependency comparison. A more nuanced understanding of React&apos;s rendering lifecycle was expected for a Senior role.
+                    {assessmentData?.verdict || 
+                      "Candidate shows strong foundational knowledge. Recommend proceeding to the next round with a focus on system design depth."}
                   </p>
                 </div>
 
-                <div className="animate-fade-slide-up" style={{ animationDelay: "300ms" }}>
-                  <h4 className="font-sans text-base font-bold text-white mb-2">Behavioral Indicators</h4>
-                  <ul className="list-disc list-inside space-y-2 text-on-surface-variant leading-relaxed">
-                    <li>Takes proactive ownership of technical debt.</li>
-                    <li>Pragmatic approach to testing (favors integration over exhaustive unit tests).</li>
-                    <li>Slight tendency to interrupt when eager to answer.</li>
-                  </ul>
-                </div>
+                {assessmentData?.strengths && assessmentData.strengths.length > 0 && (
+                  <div className="animate-fade-slide-up" style={{ animationDelay: "300ms" }}>
+                    <h4 className="font-sans text-base font-bold text-white mb-2">Behavioral Indicators</h4>
+                    <ul className="list-disc list-inside space-y-2 text-on-surface-variant leading-relaxed">
+                      {assessmentData.strengths.map((s, i) => (
+                        <li key={i}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -474,35 +543,26 @@ export default function InterviewPage() {
                 </div>
 
                 <div className="p-5 flex-1 flex flex-col gap-5 text-left">
-                  {/* Weakness 1 */}
-                  <div className="border border-outline-variant/60 rounded p-4 bg-[#050508]/40 relative group hover:border-red-500/20 transition-all duration-300">
-                    <div className="absolute -left-[1px] top-4 bottom-4 w-[2px] bg-red-500 group-hover:shadow-[0_0_8px_rgba(239,68,68,0.8)]"></div>
-                    <h4 className="text-xs font-mono uppercase text-white font-bold mb-1">Performance Anti-Patterns</h4>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed mb-3">
-                      Advocated for indiscriminate use of React memoization hooks without understanding the memory overhead tradeoffs.
-                    </p>
-                    <div className="bg-surface-dim p-3 rounded border border-outline-variant/60">
-                      <span className="text-[9px] font-mono text-cyber-blue font-bold block mb-1 uppercase tracking-wider">Action Item</span>
-                      <span className="text-xs text-on-surface-variant font-sans leading-normal block">
-                        Probe deeper on profiling tools (React DevTools Profiler) in follow-up round. Ask for a specific scenario where memoization hurt performance.
-                      </span>
+                  {(assessmentData?.weaknesses && assessmentData.weaknesses.length > 0 
+                    ? assessmentData.weaknesses 
+                    : ["Performance Anti-Patterns", "CSS Architecture"]
+                  ).map((weakness, idx) => (
+                    <div key={idx} className={`border border-outline-variant/60 rounded p-4 bg-[#050508]/40 relative group ${idx % 2 === 0 ? "hover:border-red-500/20" : "hover:border-cyber-blue/20"} transition-all duration-300`}>
+                      <div className={`absolute -left-[1px] top-4 bottom-4 w-[2px] ${idx % 2 === 0 ? "bg-red-500 group-hover:shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-cyber-blue group-hover:shadow-[0_0_8px_rgba(0,210,255,0.8)]"}`}></div>
+                      <h4 className="text-xs font-mono uppercase text-white font-bold mb-1">
+                        {assessmentData ? `Gap ${idx + 1}` : (idx === 0 ? "Performance Anti-Patterns" : "CSS Architecture")}
+                      </h4>
+                      <p className="text-[11px] text-on-surface-variant leading-relaxed mb-3">
+                        {weakness}
+                      </p>
+                      <div className="bg-surface-dim p-3 rounded border border-outline-variant/60">
+                        <span className="text-[9px] font-mono text-cyber-blue font-bold block mb-1 uppercase tracking-wider">Action Item</span>
+                        <span className="text-xs text-on-surface-variant font-sans leading-normal block">
+                          Focus on this area in follow-up technical rounds. Prepare targeted questions to probe understanding.
+                        </span>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Weakness 2 */}
-                  <div className="border border-outline-variant/60 rounded p-4 bg-[#050508]/40 relative group hover:border-cyber-blue/20 transition-all duration-300">
-                    <div className="absolute -left-[1px] top-4 bottom-4 w-[2px] bg-cyber-blue group-hover:shadow-[0_0_8px_rgba(0,210,255,0.8)]"></div>
-                    <h4 className="text-xs font-mono uppercase text-white font-bold mb-1">CSS Architecture</h4>
-                    <p className="text-[11px] text-on-surface-variant leading-relaxed mb-3">
-                      Struggled to articulate the differences between utility-first frameworks (Tailwind) and CSS-in-JS solutions under heavy load.
-                    </p>
-                    <div className="bg-surface-dim p-3 rounded border border-outline-variant/60">
-                      <span className="text-[9px] font-mono text-cyber-blue font-bold block mb-1 uppercase tracking-wider">Action Item</span>
-                      <span className="text-xs text-on-surface-variant font-sans leading-normal block">
-                        Provide a complex layout requirement in a potential technical take-home test to evaluate practical implementation.
-                      </span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
                 <div className="p-4 border-t border-outline-variant mt-auto">

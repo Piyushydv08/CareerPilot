@@ -26,6 +26,14 @@ class ResumeDataSchema(BaseModel):
     gaps: List[SkillGapSchema]
     ats_score: Optional[int] = 0
 
+# --- Cover Letter Models ---
+class CoverLetterRequest(BaseModel):
+    resume: ResumeDataSchema
+    job_description: str
+
+class CoverLetterResponse(BaseModel):
+    cover_letter: str
+
 # --- Match Analysis Models ---
 class MatchAnalysisRequest(BaseModel):
     resume: Optional[ResumeDataSchema] = None
@@ -64,6 +72,30 @@ class InterviewRespondRequest(BaseModel):
 class InterviewRespondResponse(BaseModel):
     reply: str
 
+# --- Interview: Learning Path Models ---
+class GenerateLearningPathRequest(BaseModel):
+    gaps: List[str]
+
+class LearningMilestone(BaseModel):
+    title: str
+    description: str
+    resources: List[str]
+
+class GenerateLearningPathResponse(BaseModel):
+    milestones: List[LearningMilestone]
+
+# --- Interview: Assessment Rubric Models ---
+class InterviewAssessRequest(BaseModel):
+    chat_history: List[ChatMessageSchema]
+
+class InterviewAssessResponse(BaseModel):
+    overall_score: int
+    technical_score: int
+    communication_score: int
+    strengths: List[str]
+    weaknesses: List[str]
+    verdict: str
+
 # --- Trend Analytics Models ---
 class SalaryDistributionItem(BaseModel):
     domain: str
@@ -83,6 +115,19 @@ class TrendAnalyticsResponse(BaseModel):
     skills_demand: List[DemandSkillItem]
     work_model_ratio: dict  # {"Remote": int, "Hybrid": int, "Onsite": int}
     salaries: List[SalaryDistributionItem]
+    is_mock_data: bool = False
+
+# --- Outreach Models ---
+class OutreachGenerateRequest(BaseModel):
+    candidate_name: str
+    candidate_skills: List[str]
+    target_company: str
+    target_role: str
+    match_score: int
+
+class OutreachGenerateResponse(BaseModel):
+    subject: str
+    body: str
 
 # --- Database Core Schemas ---
 class ResumeDocument(BaseModel):

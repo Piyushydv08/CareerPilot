@@ -12,15 +12,27 @@ import {
   Sparkles,
   ArrowRight,
   TrendingUp,
-  GraduationCap
+  GraduationCap,
+  Loader,
+  ExternalLink
 } from "lucide-react";
 import { useProject } from "../context/ProjectContext";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
+interface Milestone {
+  title: string;
+  description: string;
+  resources: string[];
+}
 
 export default function SimulatorPage() {
   const { resumeData, matchScore, toggleSkillGap } = useProject();
   const [animatedScore, setAnimatedScore] = useState(matchScore);
-  const [learningPathFulfillment, setLearningPathFulfillment] = useState<string[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [showLearningPath, setShowLearningPath] = useState(false);
+  const [isGeneratingPath, setIsGeneratingPath] = useState(false);
+  const [pathError, setPathError] = useState<string | null>(null);
 
   // Animate the match score transitions smoothly!
   useEffect(() => {
@@ -39,12 +51,40 @@ export default function SimulatorPage() {
     }
   }, [matchScore, animatedScore]);
 
-  // Handle generating simulated learning path
-  const handleGeneratePath = () => {
+  // Handle generating real learning path via backend
+  const handleGeneratePath = async () => {
     if (!resumeData) return;
     const activeCheckedGaps = resumeData.gaps.filter(g => g.checked).map(g => g.name);
-    setLearningPathFulfillment(activeCheckedGaps);
+
+    if (activeCheckedGaps.length === 0) {
+      setShowLearningPath(true);
+      setMilestones([]);
+      return;
+    }
+
+    setIsGeneratingPath(true);
+    setPathError(null);
     setShowLearningPath(true);
+
+    try {
+      const response = await fetch(`${BASE_URL}/interview/generate_path`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gaps: activeCheckedGaps })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMilestones(data.milestones || []);
+      } else {
+        setPathError("Failed to generate roadmap. Please try again.");
+      }
+    } catch (e) {
+      console.error("Learning path generation failed:", e);
+      setPathError("Could not reach the AI backend. Check your connection.");
+    } finally {
+      setIsGeneratingPath(false);
+    }
   };
 
   // SVG Circular progress mathematics
@@ -125,15 +165,14 @@ export default function SimulatorPage() {
                 <div>
                   <span className="text-[10px] text-on-surface-variant block mb-2 font-semibold">Strengths Identified</span>
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="px-2 py-0.5 rounded text-[9px] border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase font-bold tracking-wider">
-                      React.js
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[9px] border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase font-bold tracking-wider">
-                      TypeScript
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[9px] border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase font-bold tracking-wider">
-                      System Design
-                    </span>
+                    {resumeData?.skills.filter(s => s.match >= 70).slice(0, 4).map(skill => (
+                      <span
+                        key={skill.name}
+                        className="px-2 py-0.5 rounded text-[9px] border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase font-bold tracking-wider"
+                      >
+                        {skill.name}
+                      </span>
+                    ))}
                   </div>
                 </div>
 
@@ -230,10 +269,14 @@ export default function SimulatorPage() {
             <div className="border-t border-outline-variant/60 pt-4 flex gap-4">
               <button 
                 onClick={handleGeneratePath}
-                className="w-full rounded bg-white py-3 font-mono text-xs font-bold text-black uppercase tracking-wider hover:bg-cyber-blue hover:text-black hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
+                disabled={isGeneratingPath}
+                className="w-full rounded bg-white py-3 font-mono text-xs font-bold text-black uppercase tracking-wider hover:bg-cyber-blue hover:text-black hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <Award className="h-4.5 w-4.5" />
-                <span>Generate Learning Roadmap</span>
+                {isGeneratingPath ? (
+                  <><Loader className="h-4.5 w-4.5 animate-spin" /><span>Generating Roadmap...</span></>
+                ) : (
+                  <><Award className="h-4.5 w-4.5" /><span>Generate Learning Roadmap</span></>
+                )}
               </button>
             </div>
           </div>
@@ -248,14 +291,28 @@ export default function SimulatorPage() {
                 </h3>
               </div>
 
-              {learningPathFulfillment.length === 0 ? (
+              {isGeneratingPath ? (
+                <div className="space-y-4 animate-pulse">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="space-y-2">
+                      <div className="h-4 bg-surface-container-high rounded shimmer-bg w-1/2"></div>
+                      <div className="h-3 bg-surface-container rounded shimmer-bg w-full"></div>
+                      <div className="h-3 bg-surface-container rounded shimmer-bg w-4/5"></div>
+                    </div>
+                  ))}
+                </div>
+              ) : pathError ? (
+                <div className="font-mono text-xs text-red-400 p-4 border border-red-500/20 rounded bg-red-500/5">
+                  {pathError}
+                </div>
+              ) : milestones.length === 0 ? (
                 <div className="text-center font-mono text-xs text-on-surface-variant/60 py-4">
                   Please select one or more gap matrices in the checklist to generate customized learning milestones.
                 </div>
               ) : (
                 <div className="space-y-6 relative pl-4 border-l border-outline-variant/80 ml-2 py-2">
-                  {learningPathFulfillment.map((item, idx) => (
-                    <div key={item} className="relative group text-left">
+                  {milestones.map((milestone, idx) => (
+                    <div key={idx} className="relative group text-left">
                       {/* Pulsing indicator block */}
                       <span className="absolute -left-[21px] top-1 h-3.5 w-3.5 rounded-full border border-cyber-blue bg-[#0c0c10] flex items-center justify-center">
                         <span className="h-1.5 w-1.5 rounded-full bg-cyber-blue animate-pulse"></span>
@@ -265,12 +322,28 @@ export default function SimulatorPage() {
                         <span className="font-mono text-[9px] text-cyber-blue uppercase tracking-wider">
                           MILESTONE {(idx + 1).toString().padStart(2, "0")}: IN PROGRESS
                         </span>
-                        <h4 className="font-sans text-sm font-semibold text-white mt-1 leading-none">
-                          Fulfill node: {item}
+                        <h4 className="font-sans text-sm font-semibold text-white mt-1 leading-snug">
+                          {milestone.title}
                         </h4>
                         <p className="text-xs text-on-surface-variant mt-2 leading-relaxed max-w-lg">
-                          Recommended Actions: Read official documentations, build an isolated sandbox module in your project, and trigger a simulated assessment interview session under this category.
+                          {milestone.description}
                         </p>
+                        {milestone.resources.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {milestone.resources.map((resource, rIdx) => (
+                              <a
+                                key={rIdx}
+                                href={resource.startsWith("http") ? resource : undefined}
+                                target={resource.startsWith("http") ? "_blank" : undefined}
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue rounded hover:bg-cyber-blue/10 transition-colors"
+                              >
+                                {resource.startsWith("http") && <ExternalLink className="h-2.5 w-2.5" />}
+                                <span className="truncate max-w-[200px]">{resource.replace(/^https?:\/\//, "")}</span>
+                              </a>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}

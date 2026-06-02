@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import { 
   UploadCloud, 
   FileText, 
@@ -12,9 +13,13 @@ import {
   Building,
   Calendar,
   Send,
-  Loader
+  Loader,
+  FileEdit,
+  ChevronDown
 } from "lucide-react";
 import { useProject } from "../context/ProjectContext";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 export default function AnalyzePage() {
   const { 
@@ -31,6 +36,12 @@ export default function AnalyzePage() {
   const [jobInput, setJobInput] = useState(jobDescription);
   const [isUpdatingMatch, setIsUpdatingMatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cover letter state
+  const [coverLetter, setCoverLetter] = useState<string | null>(null);
+  const [isGeneratingCover, setIsGeneratingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const [showCoverPanel, setShowCoverPanel] = useState(false);
 
   // Steps for the parsing skeleton simulation
   const parsingSteps = [
@@ -70,6 +81,8 @@ export default function AnalyzePage() {
   const processFileUpload = async (file: File) => {
     // Run visual skeleton steps timer
     setParsingStep(0);
+    setCoverLetter(null);
+    setShowCoverPanel(false);
     const interval = setInterval(() => {
       setParsingStep(prev => {
         if (prev < parsingSteps.length - 1) return prev + 1;
@@ -92,6 +105,37 @@ export default function AnalyzePage() {
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
+  };
+
+  // Generate cover letter via backend
+  const handleGenerateCoverLetter = async () => {
+    if (!resumeData) return;
+    setIsGeneratingCover(true);
+    setCoverError(null);
+    setShowCoverPanel(true);
+
+    try {
+      const response = await fetch(`${BASE_URL}/resume/cover_letter`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resume: resumeData,
+          job_description: jobInput || jobDescription
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setCoverLetter(data.cover_letter);
+      } else {
+        setCoverError("Cover letter generation failed. Please try again.");
+      }
+    } catch (e) {
+      console.error("Cover letter fetch failed:", e);
+      setCoverError("Could not reach the AI backend. Check your connection.");
+    } finally {
+      setIsGeneratingCover(false);
+    }
   };
 
   return (
@@ -131,7 +175,7 @@ export default function AnalyzePage() {
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.doc,.docx,.txt"
+                accept=".pdf,.docx"
                 onChange={handleFileChange}
               />
               <UploadCloud className={`h-12 w-12 mb-4 transition-transform duration-300 group-hover:scale-110 ${
@@ -141,7 +185,7 @@ export default function AnalyzePage() {
                 Drag and drop your resume file
               </p>
               <p className="font-mono text-[10px] text-on-surface-variant uppercase tracking-wider text-center">
-                PDF, DOCX, TXT UP TO 8MB
+                PDF, DOCX UP TO 8MB
               </p>
             </div>
 
@@ -305,6 +349,21 @@ export default function AnalyzePage() {
                   ))}
                 </div>
               </div>
+
+              {/* Cover Letter Generator CTA */}
+              <div className="border-t border-outline-variant/60 pt-4">
+                <button
+                  onClick={handleGenerateCoverLetter}
+                  disabled={isGeneratingCover}
+                  className="w-full py-3 rounded border border-outline-variant bg-surface-container-low hover:bg-surface-container hover:border-cyber-blue/30 hover:text-cyber-blue text-white font-mono text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isGeneratingCover ? (
+                    <><Loader className="h-4 w-4 animate-spin" /><span>Generating Cover Letter...</span></>
+                  ) : (
+                    <><FileEdit className="h-4 w-4" /><span>Generate Cover Letter with AI</span></>
+                  )}
+                </button>
+              </div>
             </div>
           ) : (
             /* Blank state */
@@ -316,6 +375,40 @@ export default function AnalyzePage() {
               <p className="text-xs text-on-surface-variant/60 max-w-xs mt-2 leading-relaxed">
                 Please drag and drop a valid resume file in the ingestion area to initialize career intelligence telemetry.
               </p>
+            </div>
+          )}
+
+          {/* Cover Letter Output Panel */}
+          {showCoverPanel && (
+            <div className="bento-card rounded-lg p-6 flex flex-col gap-4 animate-fade-slide-up">
+              <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
+                <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
+                  <FileEdit className="h-4 w-4" />
+                  <span>AI Generated Cover Letter</span>
+                </h3>
+                <span className="font-mono text-[9px] text-on-surface-variant bg-surface-dim border border-outline-variant px-2 py-0.5 rounded-sm uppercase">
+                  Gemini 1.5 Flash
+                </span>
+              </div>
+
+              {isGeneratingCover ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-4 bg-surface-container-high rounded shimmer-bg w-3/4"></div>
+                  <div className="h-4 bg-surface-container rounded shimmer-bg w-full"></div>
+                  <div className="h-4 bg-surface-container rounded shimmer-bg w-5/6"></div>
+                  <div className="h-4 bg-surface-container rounded shimmer-bg w-full"></div>
+                  <div className="h-4 bg-surface-container rounded shimmer-bg w-2/3"></div>
+                </div>
+              ) : coverError ? (
+                <div className="flex items-center gap-2 text-red-400 font-mono text-xs p-4 border border-red-500/20 rounded bg-red-500/5">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{coverError}</span>
+                </div>
+              ) : coverLetter ? (
+                <div className="prose prose-invert prose-sm max-w-none text-on-surface-variant leading-relaxed text-sm [&>p]:mb-4 [&>h1]:text-white [&>h2]:text-white [&>h3]:text-cyber-blue [&>strong]:text-white">
+                  <ReactMarkdown>{coverLetter}</ReactMarkdown>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
