@@ -173,6 +173,11 @@ export default function SimulatorPage() {
                         {skill.name}
                       </span>
                     ))}
+                    {(!resumeData || resumeData.skills.filter(s => s.match >= 70).length === 0) && (
+                      <span className="text-[10px] text-on-surface-variant italic font-semibold">
+                        No strengths indexed yet. Upload a resume first.
+                      </span>
+                    )}
                   </div>
                 </div>
 

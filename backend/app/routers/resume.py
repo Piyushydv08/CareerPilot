@@ -3,7 +3,7 @@ import io
 import json
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, File, UploadFile, Depends, HTTPException, status, Body
 from app.models.schemas import ResumeDataSchema, SkillSchema, ExperienceSchema, SkillGapSchema, CoverLetterRequest, CoverLetterResponse
 from app.core.database import get_database
@@ -21,30 +21,103 @@ genai.configure(api_key=GEMINI_API_KEY)
 IS_MOCK_MODE = GEMINI_API_KEY == "mock-key-replace-in-production"
 
 
-def calculate_ats_score(experience_list: list) -> int:
-    """Local heuristic rule-based processing step to calculate an ATS score out of 100."""
-    score = 40  # Base starting score
-    active_verbs = {"led", "developed", "engineered", "built", "managed", "created", "designed", "architected", "optimized", "increased", "decreased", "improved", "spearheaded", "orchestrated"}
+def calculate_ats_score(gemini_json: dict) -> int:
+    """
+    Multi-dimensional ATS score (0-100) across five weighted pillars:
+      1. Contact Information Completeness  — up to 10 pts
+      2. Skills Breadth and Depth          — up to 25 pts
+      3. Experience Quality                — up to 35 pts
+      4. Resume Sections Completeness      — up to 15 pts
+      5. Experience Diversity              — up to 15 pts
+    """
+    total = 0
 
-    # Regex to find metrics like numbers, percentages, or dollar values
-    metrics_pattern = re.compile(r'(\d+%|\$\d+|\b\d+\s*(?:million|billion|k|m)\b)', re.IGNORECASE)
+    # ── 1. Contact Information Completeness (10 pts) ──────────────────────────
+    contact = gemini_json.get("contact_info", "")
+    has_email = bool(re.search(r'[\w.-]+@[\w.-]+', contact))
+    has_phone = bool(re.search(r'\+?[\d\s\-()]{7,}', contact))
+    if has_email and has_phone:
+        total += 10
+    elif has_email or has_phone:
+        total += 5
+
+    # ── 2. Skills Breadth and Depth (25 pts) ──────────────────────────────────
+    raw_skills = gemini_json.get("skills", [])
+    if isinstance(raw_skills, list):
+        # New flat schema: [{name, confidence}, ...]
+        unique_skills = len({s["name"] for s in raw_skills if isinstance(s, dict) and s.get("name")})
+    elif isinstance(raw_skills, dict):
+        # Legacy nested schema fallback
+        all_skill_names: set = set()
+        for items in raw_skills.values():
+            if isinstance(items, list):
+                all_skill_names.update(str(i) for i in items)
+        unique_skills = len(all_skill_names)
+    else:
+        unique_skills = 0
+
+    if unique_skills >= 16:
+        total += 25
+    elif unique_skills >= 11:
+        total += 20
+    elif unique_skills >= 7:
+        total += 15
+    elif unique_skills >= 4:
+        total += 10
+    elif unique_skills >= 1:
+        total += 5
+
+    # ── 3. Experience Quality (35 pts) ────────────────────────────────────────
+    experience_list = gemini_json.get("experience", [])
+    active_verbs = {
+        "led", "developed", "engineered", "built", "managed", "created", "designed",
+        "architected", "optimized", "increased", "decreased", "improved", "spearheaded",
+        "orchestrated", "deployed", "launched", "migrated", "automated", "reduced",
+        "scaled", "integrated", "implemented", "delivered", "established", "streamlined"
+    }
+    metrics_pattern = re.compile(
+        r'(\d+%|\$\d+|\d+\s*(?:million|billion|k|m)\b|\d+\s*(?:users|clients|requests|services|ms|seconds))',
+        re.IGNORECASE
+    )
+
+    metrics_pts = 0
+    verb_pts = 0
+    bonus_pts = 0
 
     for exp in experience_list:
         details = exp.get("details", "").lower()
-
-        # Heavily reward explicit quantitative metrics
-        if metrics_pattern.search(details):
-            score += 15
-        elif re.search(r'\d+', details):
-            score += 5
-
-        # Reward active action verbs
         words = set(details.split())
-        if words.intersection(active_verbs):
-            score += 10
+        has_metrics = bool(metrics_pattern.search(details))
+        has_verb = bool(words.intersection(active_verbs))
 
-    # Cap maximum structural score at 100
-    return min(score, 100)
+        if has_metrics and metrics_pts < 18:
+            metrics_pts = min(metrics_pts + 6, 18)
+        if has_verb and verb_pts < 12:
+            verb_pts = min(verb_pts + 4, 12)
+        if has_metrics and has_verb and bonus_pts < 5:
+            bonus_pts = min(bonus_pts + 2, 5)
+
+    total += metrics_pts + verb_pts + bonus_pts
+
+    # ── 4. Resume Sections Completeness (15 pts) ──────────────────────────────
+    if len(experience_list) >= 1:
+        total += 5
+    if unique_skills >= 4:
+        total += 5
+    if gemini_json.get("candidate_name", "Unknown Candidate") != "Unknown Candidate":
+        total += 5
+
+    # ── 5. Experience Diversity (15 pts) ──────────────────────────────────────
+    distinct_companies = len({exp.get("company", "") for exp in experience_list if exp.get("company", "")})
+    if distinct_companies >= 3:
+        total += 15
+    elif distinct_companies == 2:
+        total += 10
+    elif distinct_companies == 1:
+        total += 5
+
+    return max(0, min(total, 100))
+
 
 
 def extract_text_from_docx(file_bytes: bytes) -> str:
@@ -67,7 +140,7 @@ async def upload_resume(
     """Multipart parser uploading resume details asynchronously, extracting via pdfplumber/python-docx and Gemini."""
     logger.info(f"Received resume upload task for file: {file.filename}")
 
-    ext = os.path.splitext(file.filename)[1].lower()
+    ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in (".pdf", ".docx"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -96,16 +169,16 @@ async def upload_resume(
 
     # 1. Draft precise constraining system prompt including skill gaps extraction
     system_instruction = (
-        "You are an expert HR parser system. Extract the following strictly from the raw resume text into this exact JSON schema:\n"
+        "You are an expert HR parser and skills extraction system. Extract the following strictly from the raw resume text into this exact JSON schema:\n"
         "{\n"
         '  "candidate_name": "string",\n'
         '  "contact_info": "string (email or phone)",\n'
-        '  "skills": {\n'
-        '    "languages": ["str"],\n'
-        '    "frameworks": ["str"],\n'
-        '    "developer_tools": ["str"],\n'
-        '    "methodologies": ["str"]\n'
-        '  },\n'
+        '  "skills": [\n'
+        "    {\n"
+        '      "name": "str (clean skill name, e.g. Node.js, REST API Design, JWT Authentication)",\n'
+        '      "confidence": <integer 1-100>\n'
+        "    }\n"
+        "  ],\n"
         '  "experience": [\n'
         "    {\n"
         '      "company": "str",\n'
@@ -123,6 +196,25 @@ async def upload_resume(
         "    }\n"
         "  ]\n"
         "}\n"
+        "\n"
+        "SKILLS EXTRACTION RULES — follow all of these precisely:\n"
+        "1. SCAN ALL SECTIONS: Education, Projects, Technical Skills, Work Experience, Achievements, and Certifications for any technology or tool mention.\n"
+        "2. INCLUDE IMPLICIT SKILLS: If the candidate built something using a technology, that technology is a skill — even if it is not listed in a 'Skills' section. "
+        "   Examples: 'built a backend with Node.js and Express.js' → Node.js, Express.js, REST API Design; "
+        "   'implemented JWT-based auth' → JWT Authentication; 'used Socket.IO for real-time messaging' → Socket.IO, Real-Time Systems; "
+        "   'deployed with Docker on AWS' → Docker, AWS; 'styled with Tailwind CSS' → Tailwind CSS.\n"
+        "3. INFER FROM VERBS AND TOOL COMBINATIONS: 'implemented', 'built', 'designed', 'deployed', 'integrated', 'configured' all imply hands-on skill. "
+        "   Infer logical companion skills (e.g., Express.js implies Node.js; Redux implies React.js).\n"
+        "4. DEDUPLICATE: Treat near-duplicates as one skill with the highest applicable confidence "
+        "   (e.g., React and React.js → React.js; Mongo and MongoDB → MongoDB).\n"
+        "5. ASSIGN CONFIDENCE scores as follows:\n"
+        "   - 90-100: Core technology used across multiple projects or central to work experience (e.g., main language, primary framework).\n"
+        "   - 70-89: Used in at least one project or work experience entry with clear evidence.\n"
+        "   - 50-69: Only listed in a skills section without supporting project/experience evidence.\n"
+        "   - 30-49: Tangentially implied or inferred from a related tool — no direct mention.\n"
+        "6. CLEAN NAMES: Use canonical, industry-standard names (e.g., 'Node.js' not 'nodejs', 'REST API Design' not 'restful apis').\n"
+        "7. BE COMPREHENSIVE: Extract every technology that has any evidence of use. Do not limit the list.\n"
+        "\n"
         "For the 'gaps' array: identify the top 4 most impactful skill gaps based on what is missing or weak compared to modern industry standards for the candidate's apparent role level. "
         "Each gap must have a unique name, a category, and an impact integer between 5 and 15 (higher = more critical). "
         "Return ONLY the raw JSON output without any markdown formatting or surrounding text."
@@ -144,16 +236,16 @@ async def upload_resume(
 
     # 3. Execute a local heuristic rule-based processing step for ATS structural metric score
     extracted_experience = gemini_json.get("experience", [])
-    ats_score = calculate_ats_score(extracted_experience)
+    ats_score = calculate_ats_score(gemini_json)
 
-    # Flatten skills to align with the ResumeDataSchema
+    # Build skills list from the flat array returned by Gemini, using real confidence scores
     flattened_skills = []
-    raw_skills = gemini_json.get("skills", {})
-    for category, items in raw_skills.items():
-        if isinstance(items, list):
-            for item in items:
-                # Simulated match score for frontend display logic
-                flattened_skills.append({"name": str(item), "match": min(80 + len(str(item)), 100)})
+    raw_skills = gemini_json.get("skills", [])
+    if isinstance(raw_skills, list):
+        for item in raw_skills:
+            if isinstance(item, dict) and item.get("name"):
+                confidence = max(1, min(100, int(item.get("confidence", 50))))
+                flattened_skills.append({"name": str(item["name"]), "match": confidence})
 
     # 4. Extract Gemini-generated gaps (top 4, validated)
     raw_gaps = gemini_json.get("gaps", [])
@@ -169,7 +261,7 @@ async def upload_resume(
     parsed_data = {
         "name": gemini_json.get("candidate_name", "Unknown Candidate"),
         "email": gemini_json.get("contact_info", "No Contact Info Found"),
-        "skills": flattened_skills[:10],  # Limiting to top 10 for UI responsiveness
+        "skills": flattened_skills,  # Full deduplicated skill list with Gemini-assigned confidence scores
         "experience": extracted_experience,
         "gaps": parsed_gaps,
         "ats_score": ats_score
@@ -181,7 +273,7 @@ async def upload_resume(
             document_record = {
                 "filename": file.filename,
                 "content_type": file.content_type,
-                "uploaded_at": datetime.utcnow(),
+                "uploaded_at": datetime.now(timezone.utc),
                 "parsed_data": parsed_data,
                 "raw_extracted_text": raw_text,
                 "resume_embeddings": []

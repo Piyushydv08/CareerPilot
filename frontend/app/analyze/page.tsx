@@ -2,12 +2,12 @@
 
 import React, { useState, useRef } from "react";
 import ReactMarkdown from "react-markdown";
-import { 
-  UploadCloud, 
-  FileText, 
-  Cpu, 
-  CheckCircle, 
-  Sparkles, 
+import {
+  UploadCloud,
+  FileText,
+  Cpu,
+  CheckCircle,
+  Sparkles,
   AlertTriangle,
   Brain,
   Building,
@@ -22,13 +22,13 @@ import { useProject } from "../context/ProjectContext";
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 export default function AnalyzePage() {
-  const { 
-    resumeData, 
-    uploadResume, 
-    triggerAnalyze, 
-    isAnalyzing, 
-    jobDescription, 
-    matchScore 
+  const {
+    resumeData,
+    uploadResume,
+    triggerAnalyze,
+    isAnalyzing,
+    jobDescription,
+    matchScore
   } = useProject();
 
   const [dragActive, setDragActive] = useState(false);
@@ -159,28 +159,26 @@ export default function AnalyzePage() {
             </h3>
 
             {/* Drag drop zone */}
-            <div 
+            <div
               onDragEnter={handleDrag}
               onDragOver={handleDrag}
               onDragLeave={handleDrag}
               onDrop={handleDrop}
               onClick={handleUploadClick}
-              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-10 cursor-pointer transition-all duration-300 relative group min-h-[220px] ${
-                dragActive 
-                  ? "border-cyber-blue bg-cyber-blue/[0.04] shadow-[0_0_15px_rgba(0,210,255,0.15)] scale-[0.99]" 
+              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-10 cursor-pointer transition-all duration-300 relative group min-h-[220px] ${dragActive
+                  ? "border-cyber-blue bg-cyber-blue/[0.04] shadow-[0_0_15px_rgba(0,210,255,0.15)] scale-[0.99]"
                   : "border-outline-variant hover:border-cyber-blue/40 bg-surface-container-low"
-              }`}
+                }`}
             >
-              <input 
+              <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
                 accept=".pdf,.docx"
                 onChange={handleFileChange}
               />
-              <UploadCloud className={`h-12 w-12 mb-4 transition-transform duration-300 group-hover:scale-110 ${
-                dragActive ? "text-cyber-blue" : "text-on-surface-variant group-hover:text-cyber-blue"
-              }`} />
+              <UploadCloud className={`h-12 w-12 mb-4 transition-transform duration-300 group-hover:scale-110 ${dragActive ? "text-cyber-blue" : "text-on-surface-variant group-hover:text-cyber-blue"
+                }`} />
               <p className="font-sans text-sm font-semibold text-white mb-1.5 text-center">
                 Drag and drop your resume file
               </p>
@@ -195,13 +193,13 @@ export default function AnalyzePage() {
                 Target Alignment Profile
               </label>
               <div className="relative rounded border border-outline-variant bg-[#0c0c10] p-1 shadow-sm flex gap-2">
-                <textarea 
+                <textarea
                   className="w-full bg-transparent border-none text-white font-sans text-xs focus:ring-0 resize-none h-14 p-2 focus:outline-none"
                   placeholder="Paste target job post details..."
                   value={jobInput}
                   onChange={(e) => setJobInput(e.target.value)}
                 />
-                <button 
+                <button
                   onClick={handleRecalculateMatch}
                   disabled={isUpdatingMatch}
                   className="self-end p-2.5 rounded bg-cyber-blue text-black hover:bg-white transition-colors cursor-pointer shrink-0 disabled:opacity-50"
@@ -227,21 +225,20 @@ export default function AnalyzePage() {
                 <Loader className="h-4 w-4 animate-spin" />
                 <span>PARSING INTEGRATION ON SITE...</span>
               </h3>
-              
+
               <div className="space-y-4">
                 {parsingSteps.map((step, idx) => {
                   const isCurrent = idx === parsingStep;
                   const isDone = idx < parsingStep;
                   return (
-                    <div 
-                      key={step} 
-                      className={`flex items-center gap-3 p-3.5 rounded border transition-colors ${
-                        isCurrent 
-                          ? "border-cyber-blue bg-cyber-blue/5 text-cyber-blue" 
-                          : isDone 
+                    <div
+                      key={step}
+                      className={`flex items-center gap-3 p-3.5 rounded border transition-colors ${isCurrent
+                          ? "border-cyber-blue bg-cyber-blue/5 text-cyber-blue"
+                          : isDone
                             ? "border-outline-variant bg-surface-container-low text-on-surface-variant/70"
                             : "border-outline-variant/30 text-on-surface-variant/30"
-                      }`}
+                        }`}
                     >
                       <div className="h-4 w-4 shrink-0 flex items-center justify-center">
                         {isDone ? (
@@ -257,7 +254,7 @@ export default function AnalyzePage() {
                   );
                 })}
               </div>
-              
+
               {/* Shimmer layout boxes */}
               <div className="space-y-3 mt-4 border-t border-outline-variant/40 pt-6">
                 <div className="h-4.5 bg-surface-container-high rounded shimmer-bg w-1/3"></div>
@@ -293,11 +290,11 @@ export default function AnalyzePage() {
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {resumeData.skills.filter(s => s.match >= 70).map(skill => (
-                      <span 
+                      <span
                         key={skill.name}
                         className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase tracking-wider rounded"
                       >
-                        {skill.name}
+                        {skill.name}0
                       </span>
                     ))}
                   </div>
@@ -311,7 +308,7 @@ export default function AnalyzePage() {
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {resumeData.gaps.map(gap => (
-                      <span 
+                      <span
                         key={gap.name}
                         className="px-2.5 py-1 text-[10px] font-mono border border-red-500/20 bg-red-500/5 text-red-400 uppercase tracking-wider rounded"
                       >
@@ -327,7 +324,7 @@ export default function AnalyzePage() {
                 <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold mb-4 block uppercase">
                   Telemetry Career History
                 </span>
-                
+
                 <div className="space-y-4">
                   {resumeData.experience.map((exp, idx) => (
                     <div key={idx} className="p-4 rounded border border-outline-variant/50 bg-[#07070a]/50 hover:border-cyber-blue/20 transition-colors">
