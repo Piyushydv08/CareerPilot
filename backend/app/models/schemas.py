@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict, Any
 
 # --- Resume Models ---
 class SkillSchema(BaseModel):
@@ -97,15 +97,41 @@ class InterviewAssessResponse(BaseModel):
     verdict: str
 
 # --- Trend Analytics Models ---
+class DemandSkillItem(BaseModel):
+    name: str
+    demand_count: str
+    percentage: int
+
+
 class SalaryDistributionItem(BaseModel):
     domain: str
     median: int
     percentile90: int
 
-class DemandSkillItem(BaseModel):
+
+class CompanyDataItem(BaseModel):
     name: str
-    demand_count: str
-    percentage: int
+    canonical_name: str
+    job_count: int
+    average_salary: Optional[int] = None
+
+
+class HistoricalSalaryItem(BaseModel):
+    month: str
+    salary: int
+
+
+class CategoryItem(BaseModel):
+    tag: str
+    label: str
+
+
+class JobsworthItem(BaseModel):
+    title: str
+    predicted_salary: int
+    predictions: List[Dict[str, Any]]
+    description: str
+
 
 class TrendAnalyticsResponse(BaseModel):
     total_live_jobs: int
@@ -113,9 +139,43 @@ class TrendAnalyticsResponse(BaseModel):
     top_sector: str
     top_sector_reqs: str
     skills_demand: List[DemandSkillItem]
-    work_model_ratio: dict  # {"Remote": int, "Hybrid": int, "Onsite": int}
+    work_model_ratio: Dict[str, int]
     salaries: List[SalaryDistributionItem]
-    is_mock_data: bool = False
+    salary_histogram: List[Dict[str, Any]] = []
+    historical_salaries: List[HistoricalSalaryItem] = []
+    top_companies: List[CompanyDataItem] = []
+    regional_salaries: List[Dict[str, Any]] = []
+    categories: List[CategoryItem] = []
+    jobsworth: Optional[JobsworthItem] = None
+    is_mock_data: bool
+
+# Add these to your existing schemas.py
+
+class JobListingItem(BaseModel):
+    id: str
+    title: str
+    company: str
+    location: str
+    description: str
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    salary_is_predicted: bool = False
+    contract_type: str
+    contract_time: str
+    redirect_url: str
+    created: str
+    category: str
+    company_url: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class JobListingsResponse(BaseModel):
+    total_count: int
+    page: int
+    results_per_page: int
+    total_pages: int
+    jobs: List[JobListingItem]
 
 # --- Outreach Models ---
 class OutreachGenerateRequest(BaseModel):

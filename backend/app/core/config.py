@@ -1,13 +1,12 @@
 import os
-from typing import List, Union
+from typing import List, Union, Optional, Annotated
 from pydantic import AnyHttpUrl, BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing_extensions import Annotated
 
 def parse_cors_origins(v: Union[str, List[str]]) -> List[str]:
     if isinstance(v, str) and not v.startswith("["):
         return [i.strip() for i in v.split(",")]
-    elif isinstance(v, (list, str)):
+    elif isinstance(v, list):
         return v
     raise ValueError(v)
 
@@ -26,6 +25,10 @@ class Settings(BaseSettings):
     
     # App port
     PORT: int = 8000
+
+    # Adzuna API credentials
+    ADZUNA_APP_ID: Optional[str] = None
+    ADZUNA_APP_KEY: Optional[str] = None
     
     model_config = SettingsConfigDict(
         env_file=".env",
