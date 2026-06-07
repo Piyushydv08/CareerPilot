@@ -79,7 +79,7 @@ export const Header: React.FC = () => {
           </div>
           <div className="hidden xl:block text-left">
             <div className="font-mono text-[11px] font-medium leading-none text-white">piyus_01</div>
-            <span className="font-mono text-[9px] text-[#00d2ff]/80">Compatibility: {matchScore}%</span>
+            <span className="font-mono text-[9px] text-[#00d2ff]/80">ATS Score: {matchScore}%</span>
           </div>
         </div>
       </div>

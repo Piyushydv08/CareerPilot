@@ -40,3 +40,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 Exposes documentation portals at:
 - **Interactive Swagger Docs**: `http://localhost:8000/docs`
 - **ReDoc Telemetry**: `http://localhost:8000/redoc`
+
+
+# for mac
+source venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

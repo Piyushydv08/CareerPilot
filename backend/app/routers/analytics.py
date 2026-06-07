@@ -35,7 +35,7 @@ else:
 class AdzunaClient:
     """Client for interacting with Adzuna API endpoints"""
     
-    def __init__(self, app_id: str, app_key: str, country: str = "us"):
+    def __init__(self, app_id: str, app_key: str, country: str = "in"):
         self.app_id = app_id
         self.app_key = app_key
         self.country = country
@@ -124,7 +124,7 @@ class AdzunaClient:
 @router.get("/trends", response_model=TrendAnalyticsResponse)
 async def get_market_trends(
     domain: str = Query(..., description="Target domain query, e.g. Full Stack Developer"),
-    country: str = Query("us", description="Country code (us, gb, ca, etc.)"),
+    country: str = Query("in", description="Country code (us, gb, ca, etc.)"),
     include_historical: bool = Query(True, description="Include historical salary trends"),
     include_companies: bool = Query(True, description="Include top companies data")
 ):
@@ -352,7 +352,7 @@ async def get_market_trends(
 @router.get("/jobs")
 async def get_job_listings(
     domain: str = Query(..., description="Job role to search for"),
-    country: str = Query("us", description="Country code (us, gb, ca, etc.)"),
+    country: str = Query("in", description="Country code (us, gb, ca, etc.)"),
     location: Optional[str] = Query(None, description="Location filter"),
     results_per_page: int = Query(20, description="Number of results per page", ge=1, le=50),
     page: int = Query(1, description="Page number", ge=1)
@@ -391,13 +391,42 @@ async def get_job_listings(
 
             if response.status_code == 401:
                 raise HTTPException(status_code=401, detail="Invalid Adzuna API credentials")
-            if response.status_code == 404:
-                raise HTTPException(status_code=404, detail="No jobs found for the given criteria")
-            if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail=f"Adzuna API error: {response.text}")
+            
+            jobs = []
+            data = {}
+            if response.status_code == 200:
+                data = response.json()
+                jobs = data.get("results", [])
 
-            data = response.json()
-            jobs = data.get("results", [])
+            # Fallback 1: If over-specified (more than 2 words), try searching for the last 3 words
+            if not jobs and len(domain.split()) > 2:
+                fallback_domain = " ".join(domain.split()[-3:])
+                logger.info(f"No jobs found for '{domain}'. Trying Fallback 1: '{fallback_domain}'")
+                params["what"] = fallback_domain
+                fb_resp = await client.get(url, params=params)
+                if fb_resp.status_code == 200:
+                    data = fb_resp.json()
+                    jobs = data.get("results", [])
+
+            # Fallback 2: If still no jobs, try the first 2 words of the query
+            if not jobs and len(domain.split()) > 1:
+                fallback_domain = " ".join(domain.split()[:2])
+                logger.info(f"No jobs found. Trying Fallback 2: '{fallback_domain}'")
+                params["what"] = fallback_domain
+                fb_resp = await client.get(url, params=params)
+                if fb_resp.status_code == 200:
+                    data = fb_resp.json()
+                    jobs = data.get("results", [])
+
+            # Fallback 3: Generic Software Engineer fallback
+            if not jobs:
+                fallback_domain = "Software Engineer"
+                logger.info(f"No jobs found. Trying Fallback 3: '{fallback_domain}'")
+                params["what"] = fallback_domain
+                fb_resp = await client.get(url, params=params)
+                if fb_resp.status_code == 200:
+                    data = fb_resp.json()
+                    jobs = data.get("results", [])
 
             if not jobs:
                 return {
@@ -467,7 +496,7 @@ async def get_job_listings(
 @router.get("/jobs/{job_id}")
 async def get_job_details(
     job_id: str,
-    country: str = Query("us", description="Country code")
+    country: str = Query("in", description="Country code")
 ):
     """
     Get detailed information about a specific job with direct application link
@@ -537,16 +566,17 @@ def extract_skills(text: str, nlp_model) -> List[str]:
         return []
     
     technical_skills = []
+    generic = {"experience", "skills", "team", "work", "role", "years", 
+              "developer", "engineer", "looking", "development", "strong", 
+              "environments", "required", "ability", "abilityto", "using",
+              "including", "knowledge", "proven", "demonstrated", "excellent"}
+              
     if nlp_model:
         try:
             nlp_model.max_length = len(text) + 1000
             doc = nlp_model(text)
             for token in doc:
                 if token.pos_ in ["PROPN", "NOUN"] and len(token.text) > 2 and token.is_alpha:
-                    generic = {"experience", "skills", "team", "work", "role", "years", 
-                              "developer", "engineer", "looking", "development", "strong", 
-                              "environments", "required", "ability", "abilityto", "using",
-                              "including", "knowledge", "proven", "demonstrated", "excellent"}
                     if token.text.lower() not in generic:
                         technical_skills.append(token.text.title())
         except Exception as e:
@@ -665,5 +695,3 @@ def generate_jobsworth_predictions(domain: str, avg_salary: int) -> JobsworthIte
         predictions=predictions,
         description=f"Based on {domain} roles in current market, Jobsworth predicts competitive salaries with high confidence for standard levels."
     )
-
-

@@ -79,7 +79,7 @@ export default function Dashboard() {
           <div className="absolute inset-0 bg-cyber-blue/[0.02] group-hover:bg-cyber-blue/[0.04] transition-all duration-300 pointer-events-none"></div>
           
           <div className="flex justify-between items-start mb-8 relative z-10">
-            <h3 className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold">Target Match Index</h3>
+            <h3 className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold">Target ATS Score</h3>
             <Radar className="h-5 w-5 text-cyber-blue glow-text animate-breathe" />
           </div>
 

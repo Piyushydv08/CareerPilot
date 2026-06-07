@@ -123,6 +123,7 @@ def calculate_ats_score(gemini_json: dict) -> int:
 def extract_text_from_docx(file_bytes: bytes) -> str:
     """Extract plain text from a .docx file using python-docx."""
     try:
+        # pyrefly: ignore [missing-import]
         from docx import Document
         doc = Document(io.BytesIO(file_bytes))
         paragraphs = [para.text for para in doc.paragraphs if para.text.strip()]
@@ -130,6 +131,114 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     except Exception as e:
         logger.error(f"Failed to extract text from DOCX: {e}")
         raise HTTPException(status_code=500, detail="Failed to parse DOCX content stream.")
+
+
+
+def generate_mock_resume_data(raw_text: str) -> dict:
+    """Generate high-quality mock resume data based on the extracted text when offline/no API key."""
+    # Find candidate name: often the first non-empty line
+    lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+    candidate_name = "Varun Kumar"  # Default fallback
+    if lines:
+        for line in lines[:5]:
+            if "@" not in line and "http" not in line and 3 < len(line) < 30:
+                candidate_name = line
+                break
+
+    # Extract email
+    email_match = re.search(r'[\w.-]+@[\w.-]+', raw_text)
+    email = email_match.group(0) if email_match else "candidate@careerpilot.ai"
+
+    # Extract skills by checking presence of common tech terms in text
+    tech_keywords = [
+        "React", "React.js", "TypeScript", "JavaScript", "Node.js", "Node", "GraphQL", 
+        "Python", "Django", "Flask", "AWS", "Docker", "Kubernetes", "PostgreSQL", 
+        "MongoDB", "SQL", "Git", "CI/CD", "Next.js", "Express", "HTML", "CSS"
+    ]
+    detected_skills = []
+    text_lower = raw_text.lower()
+    
+    for tech in tech_keywords:
+        pattern = r'\b' + re.escape(tech.lower()) + r'\b'
+        if re.search(pattern, text_lower):
+            # Assign confidence: higher if mentioned multiple times
+            confidence = 85 if text_lower.count(tech.lower()) > 1 else 70
+            detected_skills.append({"name": tech, "confidence": confidence})
+            
+    # Default skills if none detected
+    if not detected_skills:
+        detected_skills = [
+            {"name": "React.js", "confidence": 90},
+            {"name": "TypeScript", "confidence": 85},
+            {"name": "Node.js", "confidence": 80},
+            {"name": "GraphQL", "confidence": 75}
+        ]
+
+    # Create dummy experience or parse years/companies if possible
+    experience = [
+        {
+            "company": "Web Innovations",
+            "role": "Senior Full Stack Developer",
+            "duration": "2022 - Present",
+            "details": "Led the architecture and development of high-performance React and Node.js web applications. Built microservices and automated CI/CD deployment pipelines using AWS and Docker."
+        },
+        {
+            "company": "Tech Solutions Inc.",
+            "role": "Frontend Engineer",
+            "duration": "2020 - 2022",
+            "details": "Developed responsive user interfaces using HTML/CSS, JavaScript, and React. Collaborated with designers to deliver premium user experiences."
+        }
+    ]
+
+    # Create gaps: identify technologies that are NOT in the detected skills
+    possible_gaps = [
+        {"name": "Docker", "category": "DevOps", "impact": 10},
+        {"name": "Kubernetes", "category": "DevOps", "impact": 12},
+        {"name": "AWS", "category": "Cloud", "impact": 15},
+        {"name": "PostgreSQL", "category": "API Design", "impact": 8},
+        {"name": "GraphQL", "category": "API Design", "impact": 7},
+        {"name": "Unit Testing", "category": "Testing", "impact": 9}
+    ]
+    
+    gaps = []
+    detected_skill_names = {str(s["name"]).lower() for s in detected_skills if isinstance(s, dict) and "name" in s}
+    for gap in possible_gaps:
+        if isinstance(gap, dict) and "name" in gap:
+            gap_name = str(gap["name"])
+            if gap_name.lower() not in detected_skill_names:
+                gaps.append({
+                    "name": gap_name,
+                    "category": str(gap.get("category", "General")),
+                    "impact": int(gap.get("impact", 10)),
+                    "checked": False
+                })
+                if len(gaps) == 4:
+                    break
+                    
+    # Fallback if we didn't get 4 gaps
+    while len(gaps) < 4:
+        current_gap_names = {str(x["name"]).lower() for x in gaps if isinstance(x, dict) and "name" in x}
+        extra_gaps = [
+            g for g in possible_gaps 
+            if isinstance(g, dict) and "name" in g and str(g["name"]).lower() not in current_gap_names
+        ]
+        if not extra_gaps:
+            break
+        target_gap = extra_gaps[0]
+        gaps.append({
+            "name": str(target_gap["name"]),
+            "category": str(target_gap.get("category", "General")),
+            "impact": int(target_gap.get("impact", 10)),
+            "checked": False
+        })
+
+    return {
+        "candidate_name": candidate_name,
+        "contact_info": email,
+        "skills": detected_skills,
+        "experience": experience,
+        "gaps": gaps
+    }
 
 
 @router.post("/upload", response_model=ResumeDataSchema)
@@ -178,7 +287,7 @@ async def upload_resume(
         '      "name": "str (clean skill name, e.g. Node.js, REST API Design, JWT Authentication)",\n'
         '      "confidence": <integer 1-100>\n'
         "    }\n"
-        "  ],\n"
+        '  ],\n'
         '  "experience": [\n'
         "    {\n"
         '      "company": "str",\n'
@@ -186,7 +295,7 @@ async def upload_resume(
         '      "duration": "str",\n'
         '      "details": "str (bulleted metrics combined)"\n'
         "    }\n"
-        "  ],\n"
+        '  ],\n'
         '  "gaps": [\n'
         "    {\n"
         '      "name": "str (skill gap name)",\n'
@@ -220,19 +329,23 @@ async def upload_resume(
         "Return ONLY the raw JSON output without any markdown formatting or surrounding text."
     )
 
-    try:
-        # 2. Pass the raw text block directly to the Gemini API utilizing structured outputs
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(
-            f"SYSTEM INSTRUCTION:\n{system_instruction}\n\nRESUME TEXT TO PARSE:\n{raw_text}",
-            generation_config=genai.GenerationConfig(
-                response_mime_type="application/json"
+    if IS_MOCK_MODE:
+        logger.info("Mock API key detected — generating mock parsed resume data locally.")
+        gemini_json = generate_mock_resume_data(raw_text)
+    else:
+        try:
+            # 2. Pass the raw text block directly to the Gemini API utilizing structured outputs
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(
+                f"SYSTEM INSTRUCTION:\n{system_instruction}\n\nRESUME TEXT TO PARSE:\n{raw_text}",
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json"
+                )
             )
-        )
-        gemini_json = json.loads(response.text)
-    except Exception as e:
-        logger.error(f"Gemini API structural extraction failure: {e}")
-        raise HTTPException(status_code=502, detail="Failed to structurally parse resume via AI subsystem.")
+            gemini_json = json.loads(response.text)
+        except Exception as e:
+            logger.error(f"Gemini API structural extraction failure: {e}")
+            raise HTTPException(status_code=502, detail="Failed to structurally parse resume via AI subsystem.")
 
     # 3. Execute a local heuristic rule-based processing step for ATS structural metric score
     extracted_experience = gemini_json.get("experience", [])
@@ -316,6 +429,25 @@ async def generate_cover_letter(payload: CoverLetterRequest):
     ]) or "Not specified"
 
     top_skills = ", ".join([s.name for s in payload.resume.skills[:6]]) or "Not specified"
+
+    if IS_MOCK_MODE:
+        logger.info("Mock API key detected — generating mock cover letter locally.")
+        cover_letter = (
+            f"# Cover Letter for {payload.resume.name}\n\n"
+            f"Dear Hiring Team,\n\n"
+            f"I am writing to express my strong interest in the open position matching my background as a professional. "
+            f"With key skills in {top_skills} and a solid track record of technical contributions, I am confident in my "
+            f"ability to add immediate value to your engineering team.\n\n"
+            f"Throughout my career, I have honed my expertise in building scalable, user-centric web applications. "
+            f"My professional history includes roles such as: {experience_summary}. These experiences have "
+            f"equipped me with the technical depth and structured problem-solving skills necessary to address complex business requirements "
+            f"and deliver high-quality solutions.\n\n"
+            f"I would appreciate the opportunity to discuss how my technical skills and professional goals align with your team's needs. "
+            f"Thank you for your time and consideration.\n\n"
+            f"Sincerely,\n"
+            f"{payload.resume.name}"
+        )
+        return CoverLetterResponse(cover_letter=cover_letter)
 
     prompt = (
         f"Write a professional cover letter for {payload.resume.name} applying to this role:\n"

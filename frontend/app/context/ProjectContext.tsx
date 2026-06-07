@@ -152,6 +152,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (response.ok) {
         const data = await response.json();
         setResumeData(data);
+        if (data.ats_score !== undefined) {
+          setMatchScore(data.ats_score);
+        }
         addTerminalLog("INFO", `Successfully parsed resume via backend.`);
         setIsAnalyzing(false);
         return true;
