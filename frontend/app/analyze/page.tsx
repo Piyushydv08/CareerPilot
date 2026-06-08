@@ -19,12 +19,235 @@ import {
   Briefcase,
   MapPin,
   Wifi,
-  File
+  File,
+  Zap,
+  Target,
+  BarChart3,
+  GraduationCap,
+  Layout,
+  ListChecks,
+  Lightbulb,
+  ShieldCheck,
+  ChevronRight
 } from "lucide-react";
-import { useProject, ResumeData } from "../context/ProjectContext";
+import { useProject, ResumeData, ATSMatchDetail } from "../context/ProjectContext";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ATS Category Score Bar
+// ─────────────────────────────────────────────────────────────────────────────
+function CategoryBar({
+  label,
+  score,
+  icon: Icon,
+  delay = 0
+}: {
+  label: string;
+  score: number;
+  icon: React.ElementType;
+  delay?: number;
+}) {
+  const color =
+    score >= 75 ? "#00d2ff" : score >= 50 ? "#f59e0b" : "#ef4444";
+  const bgColor =
+    score >= 75 ? "rgba(0,210,255,0.12)" : score >= 50 ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.12)";
+  const borderColor =
+    score >= 75 ? "rgba(0,210,255,0.25)" : score >= 50 ? "rgba(245,158,11,0.25)" : "rgba(239,68,68,0.25)";
+
+  return (
+    <div className="flex items-center gap-3 group" style={{ animationDelay: `${delay}ms` }}>
+      <div
+        className="w-7 h-7 rounded flex items-center justify-center shrink-0 border transition-colors"
+        style={{ background: bgColor, borderColor }}
+      >
+        <Icon className="h-3.5 w-3.5" style={{ color }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex justify-between items-center mb-1">
+          <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant">{label}</span>
+          <span className="font-mono text-[11px] font-bold" style={{ color }}>{score}%</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-surface-container-high overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-700 ease-out"
+            style={{
+              width: `${score}%`,
+              background: `linear-gradient(90deg, ${color}aa, ${color})`,
+              boxShadow: `0 0 6px ${color}60`
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Score Ring
+// ─────────────────────────────────────────────────────────────────────────────
+function ScoreRing({ score, isAiPowered }: { score: number; isAiPowered: boolean }) {
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (score / 100) * circumference;
+  const color = score >= 75 ? "#00d2ff" : score >= 50 ? "#f59e0b" : "#ef4444";
+  const label = score >= 80 ? "Excellent" : score >= 65 ? "Good" : score >= 45 ? "Fair" : "Weak";
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative w-36 h-36">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+          <circle
+            cx="60"
+            cy="60"
+            r={radius}
+            fill="none"
+            stroke={color}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference - progress}
+            style={{ transition: "stroke-dashoffset 1s ease-out", filter: `drop-shadow(0 0 6px ${color}80)` }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-mono text-3xl font-black" style={{ color }}>{score}</span>
+          <span className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider">/ 100</span>
+        </div>
+      </div>
+      <div className="flex flex-col items-center gap-1">
+        <span className="font-mono text-sm font-bold" style={{ color }}>{label} Match</span>
+        {isAiPowered ? (
+          <span className="flex items-center gap-1 font-mono text-[9px] text-cyber-blue bg-cyber-blue/10 border border-cyber-blue/20 px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <Zap className="h-2.5 w-2.5" /> Gemini AI Powered
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 font-mono text-[9px] text-on-surface-variant bg-surface-container border border-outline-variant/30 px-2 py-0.5 rounded-full uppercase tracking-wider">
+            <BarChart3 className="h-2.5 w-2.5" /> Heuristic Analysis
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATS Detail Panel
+// ─────────────────────────────────────────────────────────────────────────────
+function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
+  const categories = [
+    { key: "skills_match", label: "Skills Match", icon: Target },
+    { key: "experience_relevance", label: "Experience Relevance", icon: Briefcase },
+    { key: "keyword_density", label: "Keyword Density", icon: BarChart3 },
+    { key: "education_certifications", label: "Education & Certs", icon: GraduationCap },
+    { key: "formatting_completeness", label: "Formatting & Completeness", icon: Layout },
+  ] as const;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {/* Score Ring + Category Bars */}
+      <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+        <ScoreRing score={detail.match_score} isAiPowered={detail.is_ai_powered} />
+        <div className="flex-1 w-full flex flex-col gap-3">
+          {categories.map((cat, i) => (
+            <CategoryBar
+              key={cat.key}
+              label={cat.label}
+              score={detail.category_scores[cat.key]}
+              icon={cat.icon}
+              delay={i * 80}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Keywords */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-outline-variant/40 pt-5">
+        {/* Matched */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-3">
+            <ShieldCheck className="h-3.5 w-3.5 text-cyber-blue" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-cyber-blue font-semibold">
+              Matched Keywords
+            </span>
+            <span className="ml-auto font-mono text-[9px] text-cyber-blue/60 border border-cyber-blue/20 px-1.5 py-0.5 rounded-sm">
+              {detail.matched_keywords.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {detail.matched_keywords.length > 0 ? (
+              detail.matched_keywords.map((kw) => (
+                <span
+                  key={kw}
+                  className="px-2 py-0.5 text-[10px] font-mono rounded border border-cyber-blue/20 bg-cyber-blue/[0.07] text-cyber-blue"
+                >
+                  {kw}
+                </span>
+              ))
+            ) : (
+              <span className="font-mono text-[10px] text-on-surface-variant/40 italic">None detected</span>
+            )}
+          </div>
+        </div>
+
+        {/* Missing */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-3">
+            <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-red-400 font-semibold">
+              Missing Keywords
+            </span>
+            <span className="ml-auto font-mono text-[9px] text-red-400/60 border border-red-500/20 px-1.5 py-0.5 rounded-sm">
+              {detail.missing_keywords.length}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {detail.missing_keywords.length > 0 ? (
+              detail.missing_keywords.map((kw) => (
+                <span
+                  key={kw}
+                  className="px-2 py-0.5 text-[10px] font-mono rounded border border-red-500/20 bg-red-500/[0.07] text-red-400"
+                >
+                  {kw}
+                </span>
+              ))
+            ) : (
+              <span className="font-mono text-[10px] text-on-surface-variant/40 italic">None — great match!</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Suggestions */}
+      {detail.suggestions.length > 0 && (
+        <div className="border-t border-outline-variant/40 pt-5">
+          <div className="flex items-center gap-1.5 mb-3">
+            <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
+            <span className="font-mono text-[10px] uppercase tracking-wider text-amber-400 font-semibold">
+              AI Improvement Suggestions
+            </span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {detail.suggestions.map((s, i) => (
+              <div
+                key={i}
+                className="flex gap-2.5 p-3 rounded border border-amber-500/15 bg-amber-500/[0.04] text-on-surface-variant text-xs leading-relaxed"
+              >
+                <ChevronRight className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <span>{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Page
+// ─────────────────────────────────────────────────────────────────────────────
 export default function AnalyzePage() {
   const {
     resumeData,
@@ -32,7 +255,8 @@ export default function AnalyzePage() {
     triggerAnalyze,
     isAnalyzing,
     jobDescription,
-    matchScore
+    matchScore,
+    atsMatchDetail
   } = useProject();
 
   const [dragActive, setDragActive] = useState(false);
@@ -41,8 +265,6 @@ export default function AnalyzePage() {
   const [isUpdatingMatch, setIsUpdatingMatch] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-
-  // Keep a local ref to freshly uploaded resume data to avoid stale closure
   const freshResumeRef = useRef<ResumeData | null>(null);
 
   // Cover letter state
@@ -78,21 +300,14 @@ export default function AnalyzePage() {
     "Synthesizing job alignment index..."
   ];
 
-  // Build search query from resume skills + optional JD
   const buildSearchDomain = (resume: ResumeData | null, jd: string) => {
     if (jd.trim()) {
-      // Split by common separators to isolate the main job title/role
       const parts = jd.trim().split(/\s+(?:at|for|posting|in|with|on)\b/i);
       const cleanTitle = parts[0].trim();
-      if (cleanTitle) {
-        // Return the first 4 words of the job title
-        return cleanTitle.split(/\s+/).slice(0, 4).join(" ");
-      }
+      if (cleanTitle) return cleanTitle.split(/\s+/).slice(0, 4).join(" ");
       return jd.trim().split(/\s+/).slice(0, 4).join(" ");
     }
-    
     if (resume?.skills && resume.skills.length > 0) {
-      // Use top 2 skills for a broad, technology-focused search query
       return resume.skills
         .sort((a, b) => b.match - a.match)
         .slice(0, 2)
@@ -110,8 +325,7 @@ export default function AnalyzePage() {
         `${BASE_URL}/analytics/jobs?domain=${encodeURIComponent(searchDomain)}&results_per_page=6`
       );
       if (res.ok) {
-        const data = await res.json();
-        setJobsData(data);
+        setJobsData(await res.json());
       } else {
         setJobsError("Could not load job listings. Please try again.");
       }
@@ -148,18 +362,13 @@ export default function AnalyzePage() {
     await uploadResume(file);
     clearInterval(interval);
 
-    // After upload, use context resumeData via a small delay for state to settle
-    // Then fetch jobs based on resume skills
     setTimeout(async () => {
-      // Read freshest resumeData from context via ref pattern
       const currentResume = freshResumeRef.current ?? resumeData;
       const domain = buildSearchDomain(currentResume, jobInput);
       await fetchJobs(domain);
     }, 800);
   };
 
-  // Sync fresh resume ref whenever resumeData changes
-  // This is done via a useEffect-like pattern using the ref
   if (resumeData && resumeData !== freshResumeRef.current) {
     freshResumeRef.current = resumeData;
   }
@@ -167,13 +376,8 @@ export default function AnalyzePage() {
   const handleRecalculateMatch = async () => {
     if (!resumeData && !jobInput.trim()) return;
     setIsUpdatingMatch(true);
-
-    if (jobInput.trim()) {
-      await triggerAnalyze(jobInput);
-    }
+    if (jobInput.trim()) await triggerAnalyze(jobInput);
     setIsUpdatingMatch(false);
-
-    // Use the freshest resume data available
     const currentResume = freshResumeRef.current ?? resumeData;
     const domain = buildSearchDomain(currentResume, jobInput);
     await fetchJobs(domain);
@@ -190,10 +394,7 @@ export default function AnalyzePage() {
       const response = await fetch(`${BASE_URL}/resume/cover_letter`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          resume: resumeData,
-          job_description: jobInput || jobDescription
-        })
+        body: JSON.stringify({ resume: resumeData, job_description: jobInput || jobDescription })
       });
       if (response.ok) {
         const data = await response.json();
@@ -215,12 +416,12 @@ export default function AnalyzePage() {
           Telemetry Analysis <Cpu className="h-6 w-6 text-cyber-blue" />
         </h2>
         <p className="text-sm text-on-surface-variant mt-1 font-mono">
-          Centralized parser targeting /api/v1/resume/upload. Drag files to index profile indices.
+          Upload your resume and paste a job description — Gemini AI will score your ATS compatibility with a full breakdown.
         </p>
       </header>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-        {/* Left Side */}
+        {/* Left Side — Upload + JD */}
         <div className="lg:col-span-5 flex flex-col gap-6">
           <div className="bento-card rounded-lg p-6 flex flex-col gap-6">
             <h3 className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold">
@@ -240,10 +441,10 @@ export default function AnalyzePage() {
               }}
               onClick={handleUploadClick}
               className={`flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition-all duration-300 relative group min-h-[180px] ${dragActive
-                  ? "border-cyber-blue bg-cyber-blue/[0.04] shadow-[0_0_15px_rgba(0,210,255,0.15)] scale-[0.99]"
-                  : uploadedFileName
-                    ? "border-cyber-blue/40 bg-cyber-blue/[0.02]"
-                    : "border-outline-variant hover:border-cyber-blue/40 bg-surface-container-low"
+                ? "border-cyber-blue bg-cyber-blue/[0.04] shadow-[0_0_15px_rgba(0,210,255,0.15)] scale-[0.99]"
+                : uploadedFileName
+                  ? "border-cyber-blue/40 bg-cyber-blue/[0.02]"
+                  : "border-outline-variant hover:border-cyber-blue/40 bg-surface-container-low"
                 }`}
             >
               <input
@@ -276,8 +477,7 @@ export default function AnalyzePage() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center p-10">
-                  <UploadCloud className={`h-12 w-12 mb-4 transition-transform duration-300 group-hover:scale-110 ${dragActive ? "text-cyber-blue" : "text-on-surface-variant group-hover:text-cyber-blue"
-                    }`} />
+                  <UploadCloud className={`h-12 w-12 mb-4 transition-transform duration-300 group-hover:scale-110 ${dragActive ? "text-cyber-blue" : "text-on-surface-variant group-hover:text-cyber-blue"}`} />
                   <p className="font-sans text-sm font-semibold text-white mb-1.5 text-center">
                     Drag and drop your resume file
                   </p>
@@ -295,23 +495,23 @@ export default function AnalyzePage() {
                   <Briefcase className="h-3 w-3 text-cyber-blue" />
                   Job Description
                 </label>
-                <span className="font-mono text-[9px] text-on-surface-variant/50 uppercase tracking-wider border border-outline-variant/30 px-1.5 py-0.5 rounded-sm">
-                  Optional
+                <span className="font-mono text-[9px] text-cyber-blue/70 uppercase tracking-wider border border-cyber-blue/20 bg-cyber-blue/5 px-1.5 py-0.5 rounded-sm">
+                  Required for ATS Score
                 </span>
               </div>
               <div className="relative rounded border border-outline-variant bg-[#0c0c10] shadow-sm flex flex-col overflow-hidden focus-within:border-cyber-blue/40 transition-colors duration-300">
                 <textarea
-                  className="w-full bg-transparent border-none text-white font-sans text-xs focus:ring-0 resize-none h-28 p-3 focus:outline-none placeholder:text-on-surface-variant/40 leading-relaxed"
-                  placeholder={"Paste a job posting or describe the role you're targeting...\n\ne.g. Senior Frontend Engineer at a fintech startup..."}
+                  className="w-full bg-transparent border-none text-white font-sans text-xs focus:ring-0 resize-none h-36 p-3 focus:outline-none placeholder:text-on-surface-variant/40 leading-relaxed"
+                  placeholder={"Paste the full job description here...\n\ne.g. We are looking for a Senior React Engineer with 5+ years of experience building scalable web applications. Must have strong TypeScript, Node.js, and AWS skills..."}
                   value={jobInput}
                   onChange={(e) => setJobInput(e.target.value)}
                 />
                 <div className="flex items-center justify-between px-3 py-2 border-t border-outline-variant/30 bg-[#08080c]">
                   <span className="font-mono text-[9px] text-on-surface-variant/40 uppercase tracking-wider">
                     {jobInput.trim()
-                      ? `${jobInput.trim().split(/\s+/).length} words · refines job matching`
+                      ? `${jobInput.trim().split(/\s+/).length} words · Gemini will analyze`
                       : resumeData
-                        ? "Jobs matched to your resume skills"
+                        ? "Paste JD for accurate ATS score"
                         : "Upload resume first"}
                   </span>
                   <button
@@ -320,22 +520,32 @@ export default function AnalyzePage() {
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-cyber-blue text-black hover:bg-white transition-colors cursor-pointer shrink-0 disabled:opacity-30 disabled:cursor-not-allowed font-mono text-[9px] font-bold uppercase tracking-wider"
                   >
                     {isUpdatingMatch
-                      ? <><Loader className="h-3 w-3 animate-spin" /><span>Scanning...</span></>
-                      : <><Send className="h-3 w-3" /><span>Analyze</span></>}
+                      ? <><Loader className="h-3 w-3 animate-spin" /><span>Analyzing...</span></>
+                      : <><Zap className="h-3 w-3" /><span>Run ATS Check</span></>}
                   </button>
                 </div>
               </div>
             </div>
+
+            {/* ATS score hint */}
+            {!atsMatchDetail && resumeData && (
+              <div className="flex items-start gap-2 p-3 rounded border border-amber-500/20 bg-amber-500/[0.04]">
+                <Lightbulb className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                <p className="font-mono text-[10px] text-amber-400/80 leading-relaxed">
+                  Paste a job description above and click <strong>Run ATS Check</strong> to get your AI-powered score with keyword analysis and improvement suggestions.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right Side */}
+        {/* Right Side — Results */}
         <div className="lg:col-span-7 flex flex-col gap-6">
           {isAnalyzing ? (
             <div className="bento-card rounded-lg p-8 flex flex-col gap-6 animate-pulse">
               <h3 className="font-mono text-[10px] uppercase tracking-wider text-cyber-blue font-bold flex items-center gap-2">
                 <Loader className="h-4 w-4 animate-spin" />
-                <span>PARSING INTEGRATION ON SITE...</span>
+                <span>RUNNING ATS ANALYSIS...</span>
               </h3>
               <div className="space-y-4">
                 {parsingSteps.map((step, idx) => {
@@ -343,8 +553,8 @@ export default function AnalyzePage() {
                   const isDone = idx < parsingStep;
                   return (
                     <div key={step} className={`flex items-center gap-3 p-3.5 rounded border transition-colors ${isCurrent ? "border-cyber-blue bg-cyber-blue/5 text-cyber-blue"
-                        : isDone ? "border-outline-variant bg-surface-container-low text-on-surface-variant/70"
-                          : "border-outline-variant/30 text-on-surface-variant/30"
+                      : isDone ? "border-outline-variant bg-surface-container-low text-on-surface-variant/70"
+                        : "border-outline-variant/30 text-on-surface-variant/30"
                       }`}>
                       <div className="h-4 w-4 shrink-0 flex items-center justify-center">
                         {isDone ? <CheckCircle className="h-4 w-4 text-cyber-blue" />
@@ -358,85 +568,115 @@ export default function AnalyzePage() {
               </div>
             </div>
           ) : resumeData ? (
-            <div className="bento-card rounded-lg p-6 flex flex-col gap-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant/60 pb-5 gap-4">
-                <div className="text-left">
-                  <h3 className="text-xl font-bold text-white leading-none">{resumeData.name}</h3>
-                  <span className="font-mono text-[10px] text-on-surface-variant uppercase mt-2 block">{resumeData.email}</span>
-                </div>
-                <div className="flex items-center gap-3.5 bg-cyber-blue/5 border border-cyber-blue/10 rounded px-3 py-1.5">
-                  <div className="text-right">
-                    <span className="font-mono text-[9px] text-on-surface-variant block leading-none uppercase">ATS Score</span>
-                    <span className="font-mono text-base font-bold text-cyber-blue mt-1 block">{matchScore}%</span>
+            <>
+              {/* ── Profile Header Card ── */}
+              <div className="bento-card rounded-lg p-6 flex flex-col gap-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-outline-variant/60 pb-5 gap-4">
+                  <div className="text-left">
+                    <h3 className="text-xl font-bold text-white leading-none">{resumeData.name}</h3>
+                    <span className="font-mono text-[10px] text-on-surface-variant uppercase mt-2 block">{resumeData.email}</span>
                   </div>
-                  <Brain className="h-6 w-6 text-cyber-blue animate-breathe" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="text-left">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-[#00d2ff] font-semibold border-b border-cyber-blue/10 pb-2 mb-3.5 flex items-center gap-1">
-                    <Sparkles className="h-3.5 w-3.5 text-cyber-blue" />
-                    <span>Identified Strengths</span>
-                  </span>
-                  <div className="flex flex-wrap gap-2 mt-3.5">
-                    {resumeData.skills.filter(s => s.match >= 70).map(skill => (
-                      <span key={skill.name} className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase tracking-wider rounded">
-                        {skill.name}
+                  <div className="flex items-center gap-3.5 bg-cyber-blue/5 border border-cyber-blue/10 rounded px-3 py-1.5">
+                    <div className="text-right">
+                      <span className="font-mono text-[9px] text-on-surface-variant block leading-none uppercase">
+                        {atsMatchDetail ? "ATS Match Score" : "Resume Quality"}
                       </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-left">
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-red-400 font-semibold border-b border-red-500/10 pb-2 mb-3.5 flex items-center gap-1">
-                    <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                    <span>Structural Gaps</span>
-                  </span>
-                  <div className="flex flex-wrap gap-2 mt-3.5">
-                    {resumeData.gaps.map(gap => (
-                      <span key={gap.name} className="px-2.5 py-1 text-[10px] font-mono border border-red-500/20 bg-red-500/5 text-red-400 uppercase tracking-wider rounded">
-                        {gap.name}
+                      <span className={`font-mono text-base font-bold mt-1 block ${matchScore >= 75 ? "text-cyber-blue" : matchScore >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                        {matchScore}%
                       </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-left border-t border-outline-variant/60 pt-6">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold mb-4 block">
-                  Telemetry Career History
-                </span>
-                <div className="space-y-4">
-                  {resumeData.experience.map((exp, idx) => (
-                    <div key={idx} className="p-4 rounded border border-outline-variant/50 bg-[#07070a]/50 hover:border-cyber-blue/20 transition-colors">
-                      <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-2 mb-2">
-                        <h4 className="font-sans text-sm font-semibold text-white flex items-center gap-1.5">
-                          <Building className="h-3.5 w-3.5 text-cyber-blue" />
-                          <span>{exp.company}</span>
-                          <span className="text-on-surface-variant font-mono text-xs font-normal">| {exp.role}</span>
-                        </h4>
-                        <span className="font-mono text-[10px] text-on-surface-variant shrink-0 flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />{exp.duration}
-                        </span>
-                      </div>
-                      <p className="text-xs text-on-surface-variant leading-relaxed pl-5">{exp.details}</p>
                     </div>
-                  ))}
+                    <Brain className="h-6 w-6 text-cyber-blue animate-breathe" />
+                  </div>
+                </div>
+
+                {/* Skills + Gaps */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="text-left">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-[#00d2ff] font-semibold border-b border-cyber-blue/10 pb-2 mb-3.5 flex items-center gap-1">
+                      <Sparkles className="h-3.5 w-3.5 text-cyber-blue" />
+                      <span>Identified Strengths</span>
+                    </span>
+                    <div className="flex flex-wrap gap-2 mt-3.5">
+                      {resumeData.skills.filter(s => s.match >= 70).map(skill => (
+                        <span key={skill.name} className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase tracking-wider rounded">
+                          {skill.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="text-left">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-red-400 font-semibold border-b border-red-500/10 pb-2 mb-3.5 flex items-center gap-1">
+                      <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                      <span>{atsMatchDetail ? "Missing from JD" : "Structural Gaps"}</span>
+                    </span>
+                    <div className="flex flex-wrap gap-2 mt-3.5">
+                      {resumeData.gaps.map(gap => (
+                        <span key={gap.name} className="px-2.5 py-1 text-[10px] font-mono border border-red-500/20 bg-red-500/5 text-red-400 uppercase tracking-wider rounded">
+                          {gap.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Experience */}
+                <div className="text-left border-t border-outline-variant/60 pt-6">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold mb-4 block">
+                    Career History
+                  </span>
+                  <div className="space-y-4">
+                    {resumeData.experience.map((exp, idx) => (
+                      <div key={idx} className="p-4 rounded border border-outline-variant/50 bg-[#07070a]/50 hover:border-cyber-blue/20 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:justify-between items-start sm:items-center gap-2 mb-2">
+                          <h4 className="font-sans text-sm font-semibold text-white flex items-center gap-1.5">
+                            <Building className="h-3.5 w-3.5 text-cyber-blue" />
+                            <span>{exp.company}</span>
+                            <span className="text-on-surface-variant font-mono text-xs font-normal">| {exp.role}</span>
+                          </h4>
+                          <span className="font-mono text-[10px] text-on-surface-variant shrink-0 flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />{exp.duration}
+                          </span>
+                        </div>
+                        <p className="text-xs text-on-surface-variant leading-relaxed pl-5">{exp.details}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Cover Letter Button */}
+                <div className="border-t border-outline-variant/60 pt-4">
+                  <button
+                    onClick={handleGenerateCoverLetter}
+                    disabled={isGeneratingCover}
+                    className="w-full py-3 rounded border border-outline-variant bg-surface-container-low hover:bg-surface-container hover:border-cyber-blue/30 hover:text-cyber-blue text-white font-mono text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {isGeneratingCover
+                      ? <><Loader className="h-4 w-4 animate-spin" /><span>Generating Cover Letter...</span></>
+                      : <><FileEdit className="h-4 w-4" /><span>Generate Cover Letter with AI</span></>}
+                  </button>
                 </div>
               </div>
 
-              <div className="border-t border-outline-variant/60 pt-4">
-                <button
-                  onClick={handleGenerateCoverLetter}
-                  disabled={isGeneratingCover}
-                  className="w-full py-3 rounded border border-outline-variant bg-surface-container-low hover:bg-surface-container hover:border-cyber-blue/30 hover:text-cyber-blue text-white font-mono text-xs font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {isGeneratingCover
-                    ? <><Loader className="h-4 w-4 animate-spin" /><span>Generating Cover Letter...</span></>
-                    : <><FileEdit className="h-4 w-4" /><span>Generate Cover Letter with AI</span></>}
-                </button>
-              </div>
-            </div>
+              {/* ── ATS Detailed Score Card ── */}
+              {atsMatchDetail && (
+                <div className="bento-card rounded-lg p-6 flex flex-col gap-4 animate-fade-slide-up">
+                  <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
+                    <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
+                      <ListChecks className="h-4 w-4" />
+                      <span>ATS Compatibility Breakdown</span>
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      {atsMatchDetail.is_ai_powered && (
+                        <span className="flex items-center gap-1 font-mono text-[9px] text-cyber-blue bg-cyber-blue/10 border border-cyber-blue/20 px-2 py-0.5 rounded-sm uppercase tracking-wider">
+                          <Zap className="h-2.5 w-2.5" /> Gemini 2.0 Flash
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <ATSDetailPanel detail={atsMatchDetail} />
+                </div>
+              )}
+            </>
           ) : (
             <div className="bento-card rounded-lg p-12 flex flex-col items-center justify-center text-center text-on-surface-variant">
               <FileText className="h-16 w-16 mb-4 opacity-25" />
@@ -566,7 +806,7 @@ export default function AnalyzePage() {
                                 <MapPin className="h-2.5 w-2.5" />{job.location || "Location not specified"}
                               </span>
                               <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-sm border uppercase tracking-wider ${isRemote ? "text-cyber-blue border-cyber-blue/20 bg-cyber-blue/5"
-                                  : "text-on-surface-variant border-outline-variant/30 bg-surface-container-low"
+                                : "text-on-surface-variant border-outline-variant/30 bg-surface-container-low"
                                 }`}>{workType}</span>
                               <span className="font-mono text-[9px] px-1.5 py-0.5 rounded-sm border border-outline-variant/20 bg-surface-container-low text-on-surface-variant/60 uppercase tracking-wider">
                                 {job.category}

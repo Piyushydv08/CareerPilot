@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import logging
 import json
@@ -6,7 +7,12 @@ import spacy
 from datetime import datetime
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-import google.generativeai as genai
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+# Load .env before reading any env vars
+load_dotenv()
 
 from app.models.schemas import (
     InterviewStartRequest,
@@ -26,8 +32,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/interview", tags=["interview"])
 
 # Initialize Gemini SDK
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "mock-key-replace-in-production")
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+_gemini_client: genai.Client | None = None
+
+def get_gemini_client() -> genai.Client:
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
+
+def extract_json(text: str) -> dict:
+    """Strip markdown fences and robustly parse JSON from a Gemini response."""
+    text = text.strip()
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'```\s*$', '', text)
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r'\{[\s\S]+\}', text)
+    if m:
+        return json.loads(m.group(0))
+    raise ValueError(f"No valid JSON in Gemini response: {text[:200]}")
 
 # Load spaCy NLP model for localized validation of technical terminology
 try:
@@ -61,8 +88,11 @@ async def start_interview(
     """
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(system_prompt)
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=system_prompt,
+        )
         initial_question = response.text.strip()
     except Exception as e:
         logger.error(f"Gemini API failure during /start: {e}")
@@ -115,7 +145,7 @@ async def respond_interview(
     chat_history_text = "\n".join([f"{msg.sender}: {msg.text}" for msg in payload.chat_history])
     chat_history_text += f"\nUSER: {payload.response}\n"
 
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    client = get_gemini_client()
 
     if payload.is_complete:
         # 3. Direct Gemini to perform an evaluation against a multi-criteria rubric in Markdown
@@ -137,7 +167,10 @@ async def respond_interview(
         scores out of 10 for each criteria, and a final verdict.
         """
         try:
-            response = model.generate_content(eval_prompt)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=eval_prompt,
+            )
             reply = response.text.strip()
         except Exception as e:
             logger.error(f"Gemini evaluation failure: {e}")
@@ -158,7 +191,10 @@ async def respond_interview(
         Provide ONLY your next follow-up question. Be concise and conversational.
         """
         try:
-            response = model.generate_content(followup_prompt)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=followup_prompt,
+            )
             reply = response.text.strip()
         except Exception as e:
             logger.error(f"Gemini followup failure: {e}")
@@ -215,12 +251,13 @@ async def generate_learning_path(payload: GenerateLearningPathRequest):
     )
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
-        milestones_raw = json.loads(response.text)
+        milestones_raw = extract_json(response.text)
 
         milestones = []
         for m in milestones_raw:
@@ -281,12 +318,13 @@ async def assess_interview(payload: InterviewAssessRequest):
     )
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
-        rubric = json.loads(response.text)
+        rubric = extract_json(response.text)
 
         result = InterviewAssessResponse(
             overall_score=max(0, min(100, int(rubric.get("overall_score", 75)))),

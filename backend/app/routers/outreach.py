@@ -1,8 +1,14 @@
 import os
+import re
 import json
 import logging
 from fastapi import APIRouter, HTTPException
-import google.generativeai as genai
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+# Load .env before reading any env vars
+load_dotenv()
 
 from app.models.schemas import OutreachGenerateRequest, OutreachGenerateResponse
 
@@ -10,8 +16,30 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/outreach", tags=["outreach"])
 
 # Initialize Gemini SDK
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "mock-key-replace-in-production")
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+_gemini_client: genai.Client | None = None
+
+def get_gemini_client() -> genai.Client:
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
+
+
+def extract_json(text: str) -> dict:
+    """Strip markdown fences and robustly parse JSON from a Gemini response."""
+    text = text.strip()
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'```\s*$', '', text)
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    m = re.search(r'\{[\s\S]+\}', text)
+    if m:
+        return json.loads(m.group(0))
+    raise ValueError(f"No valid JSON in Gemini response: {text[:200]}")
 
 
 @router.post("/generate", response_model=OutreachGenerateResponse)
@@ -37,12 +65,13 @@ async def generate_outreach_email(payload: OutreachGenerateRequest):
     )
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
-        result = json.loads(response.text)
+        result = extract_json(response.text)
 
         subject = str(result.get("subject", f"{payload.target_role} Opportunity — {payload.candidate_name}"))
         body = str(result.get("body", ""))

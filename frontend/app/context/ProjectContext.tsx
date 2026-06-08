@@ -18,6 +18,24 @@ export interface ResumeData {
   experience: Array<{ company: string; role: string; duration: string; details: string }>;
   gaps: SkillGap[];
   ats_score?: number;
+  raw_text?: string; // Full extracted resume text for ATS analysis
+}
+
+export interface ATSCategoryScores {
+  skills_match: number;
+  experience_relevance: number;
+  keyword_density: number;
+  education_certifications: number;
+  formatting_completeness: number;
+}
+
+export interface ATSMatchDetail {
+  match_score: number;
+  category_scores: ATSCategoryScores;
+  matched_keywords: string[];
+  missing_keywords: string[];
+  suggestions: string[];
+  is_ai_powered: boolean;
 }
 
 export interface ChatMessage {
@@ -30,6 +48,7 @@ interface ProjectContextType {
   resumeData: ResumeData | null;
   jobDescription: string;
   matchScore: number;
+  atsMatchDetail: ATSMatchDetail | null;
   isAnalyzing: boolean;
   messages: ChatMessage[];
   sessionId: string | null;
@@ -57,38 +76,16 @@ interface ProjectContextType {
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
-const initialResumeData: ResumeData = {
-  name: "Piyush Sharma",
-  email: "piyush@careerpilot.ai",
-  skills: [
-    { name: "React.js", match: 95 },
-    { name: "TypeScript", match: 88 },
-    { name: "GraphQL", match: 45 },
-    { name: "System Design", match: 30 }
-  ],
-  experience: [
-    { company: "Stripe", role: "Software Engineer Contractor", duration: "2024 - Present", details: "Led frontend migrations to modern App Router structures and built dynamic analytics views." },
-    { company: "Fintech Startup", role: "Frontend Dev", duration: "2022 - 2024", details: "Engineered responsive data interfaces and state integration pipelines using React and Redux." }
-  ],
-  gaps: [
-    { name: "AWS Cloud Practitioner", category: "Infrastructure", impact: 12, checked: false },
-    { name: "Docker & Kubernetes", category: "DevOps", impact: 9, checked: false },
-    { name: "GraphQL Mastery", category: "API Design", impact: 7, checked: false },
-    { name: "Unit Testing - Jest/RTL", category: "Quality Assurance", impact: 5, checked: false }
-  ],
-  ats_score: 72
-};
+const initialResumeData: ResumeData | null = null;
 
-const initialLogs = [
-  { time: "10:42:01", type: "INFO" as const, message: "Resume successfully parsed and indexed.", relativeTime: "2m ago" },
-  { time: "09:15:44", type: "EXEC" as const, message: "Simulated interview #452 completed. Score: 8/10.", relativeTime: "1h ago" },
-  { time: "08:00:00", type: "WARN" as const, message: "Detected new job posting matching profile (Stripe).", relativeTime: "2h ago" }
-];
+const initialLogs: Array<{ time: string; type: "INFO" | "EXEC" | "WARN"; message: string; relativeTime: string }> = [];
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [resumeData, setResumeData] = useState<ResumeData | null>(initialResumeData);
-  const [jobDescription, setJobDescription] = useState<string>("Senior Frontend Engineer posting at Stripe");
-  const [matchScore, setMatchScore] = useState<number>(84);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [jobDescription, setJobDescription] = useState<string>("");
+  const [matchScore, setMatchScore] = useState<number>(0);
+  const [atsMatchDetail, setAtsMatchDetail] = useState<ATSMatchDetail | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -152,6 +149,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (response.ok) {
         const data = await response.json();
         setResumeData(data);
+        setUploadedFile(file);
         if (data.ats_score !== undefined) {
           setMatchScore(data.ats_score);
         }
@@ -159,80 +157,75 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setIsAnalyzing(false);
         return true;
       }
-      throw new Error("Backend response failed, initiating simulation fallback...");
+      throw new Error("Backend response failed");
     } catch (e) {
-      console.warn("Backend unavailable, using simulation", e);
-      // Simulation fallback
-      await new Promise(resolve => setTimeout(resolve, 2500)); // Shimmer delay
-      setResumeData({
-        name: file.name.split(".")[0],
-        email: "fallback-candidate@careerpilot.ai",
-        skills: [
-          { name: "React.js", match: 98 },
-          { name: "TypeScript", match: 92 },
-          { name: "GraphQL", match: 80 },
-          { name: "System Design", match: 65 }
-        ],
-        experience: [
-          { company: "Web Innovations", role: "Senior Developer", duration: "2020 - Present", details: "Engineered highly animated web applications with dynamic layouts and modern styling stacks." }
-        ],
-        gaps: [
-          { name: "AWS Cloud Practitioner", category: "Infrastructure", impact: 12, checked: false },
-          { name: "Docker & Kubernetes", category: "DevOps", impact: 9, checked: false },
-          { name: "GraphQL Mastery", category: "API Design", impact: 7, checked: true },
-          { name: "Unit Testing - Jest/RTL", category: "Quality Assurance", impact: 5, checked: false }
-        ],
-        ats_score: 68
-      });
-      setMatchScore(88);
-      addTerminalLog("INFO", `Parsed resume: ${file.name} (Local AI engine simulation)`);
+      console.error("Upload failed", e);
+      addTerminalLog("WARN", `Upload failed: ${file.name}`);
       setIsAnalyzing(false);
-      return true;
+      return false;
     }
   };
 
-  // Analyze Job Description
+  // Analyze Job Description — Gemini-powered ATS analysis
   const triggerAnalyze = async (jobDesc: string): Promise<number> => {
     setIsAnalyzing(true);
     setJobDescription(jobDesc);
-    addTerminalLog("INFO", `Analyzing compatibility with job description profile.`);
+    addTerminalLog("INFO", `Running ATS compatibility analysis against job description...`);
 
     try {
-      const response = await fetch(`${BASE_URL}/match/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resume: resumeData, job_description: jobDesc })
-      });
+      let response;
+      // Prefer new streamlit/match endpoint when file is available
+      if (uploadedFile) {
+        const form = new FormData();
+        form.append("file", uploadedFile);
+        form.append("job_description", jobDesc);
+        response = await fetch(`${BASE_URL}/resume/streamlit/match`, {
+          method: "POST",
+          body: form
+        });
+      } else {
+        response = await fetch(`${BASE_URL}/match/analyze`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            resume: resumeData,
+            job_description: jobDesc,
+            resume_raw_text: resumeData?.raw_text || null
+          })
+        });
+      }
 
       if (response.ok) {
         const data = await response.json();
-        setMatchScore(data.match_score);
-
-        // Map missing_terms to SkillGap objects and update resumeData.gaps if returned
-        if (data.missing_terms && data.missing_terms.length > 0 && resumeData) {
-          const newGaps: SkillGap[] = data.missing_terms.slice(0, 4).map((term: { term: string; weight: number }) => ({
-            name: term.term.charAt(0).toUpperCase() + term.term.slice(1),
-            category: "Job Requirement",
-            impact: Math.min(15, Math.max(5, Math.round(term.weight / 10))),
-            checked: false
-          }));
-          // Merge with existing gaps — keep Gemini-parsed gaps, add job-specific ones
-          setResumeData(prev => prev ? { ...prev, gaps: newGaps } : prev);
+        // If it's the streamlit/match shape
+        if (data.match_percentage !== undefined) {
+          setMatchScore(data.match_percentage);
+          setAtsMatchDetail(prev => prev ? { ...prev, match_score: data.match_percentage } : null);
+          addTerminalLog("INFO", `ATS analysis complete (streamlit). Match score: ${data.match_percentage}%.`);
+          setIsAnalyzing(false);
+          return data.match_percentage;
         }
-
-        addTerminalLog("INFO", `Profile matching complete. Compatibility: ${data.match_score}%.`);
+        // Otherwise assume legacy shape
+        setMatchScore(data.match_score);
+        setAtsMatchDetail({
+          match_score: data.match_score,
+          category_scores: data.category_scores,
+          matched_keywords: data.matched_keywords || [],
+          missing_keywords: data.missing_keywords || [],
+          suggestions: data.suggestions || [],
+          is_ai_powered: data.is_ai_powered || false
+        });
+        addTerminalLog("INFO", `ATS analysis complete. Match score: ${data.match_score}%.`);
         setIsAnalyzing(false);
         return data.match_score;
       }
-      throw new Error("Backend failed, deploying simulation...");
+      throw new Error("Backend failed");
     } catch (e) {
-      console.log(e);
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      const simulatedScore = Math.floor(Math.random() * 20) + 75; // 75% to 95%
-      setMatchScore(simulatedScore);
-      addTerminalLog("INFO", `Profile matching completed. Compatibility index: ${simulatedScore}%.`);
+      console.error("ATS analysis failed", e);
+      addTerminalLog("WARN", "ATS analysis failed — backend unavailable or error occurred.");
       setIsAnalyzing(false);
-      return simulatedScore;
+      setAtsMatchDetail(null);
+      return 0;
     }
   };
 
@@ -351,6 +344,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         resumeData,
         jobDescription,
         matchScore,
+        atsMatchDetail,
         isAnalyzing,
         messages,
         sessionId,

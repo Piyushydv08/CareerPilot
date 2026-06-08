@@ -25,6 +25,7 @@ class ResumeDataSchema(BaseModel):
     experience: List[ExperienceSchema]
     gaps: List[SkillGapSchema]
     ats_score: Optional[int] = 0
+    raw_text: Optional[str] = None  # Full extracted resume text for ATS analysis
 
 # --- Cover Letter Models ---
 class CoverLetterRequest(BaseModel):
@@ -38,16 +39,27 @@ class CoverLetterResponse(BaseModel):
 class MatchAnalysisRequest(BaseModel):
     resume: Optional[ResumeDataSchema] = None
     job_description: str
+    resume_raw_text: Optional[str] = None  # Full raw resume text for deep ATS analysis
 
 class MissingTerm(BaseModel):
     term: str
     weight: float
 
+class ATSCategoryScores(BaseModel):
+    skills_match: int = Field(..., ge=0, le=100, description="How well resume skills align with JD requirements")
+    experience_relevance: int = Field(..., ge=0, le=100, description="How relevant experience is to the role")
+    keyword_density: int = Field(..., ge=0, le=100, description="Presence of important JD keywords in resume")
+    education_certifications: int = Field(..., ge=0, le=100, description="Education/cert fit for the role")
+    formatting_completeness: int = Field(..., ge=0, le=100, description="Resume structure and completeness score")
+
 class MatchAnalysisResponse(BaseModel):
     match_score: int = Field(..., ge=0, le=100)
-    tfidf_score: float
-    semantic_score: float
-    missing_terms: List[MissingTerm]
+    category_scores: ATSCategoryScores
+    matched_keywords: List[str] = Field(default_factory=list)
+    missing_keywords: List[str] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+    missing_terms: List[MissingTerm] = Field(default_factory=list)  # Kept for backward compat
+    is_ai_powered: bool = False
 
 # --- Interview Models ---
 class InterviewStartRequest(BaseModel):

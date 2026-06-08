@@ -8,17 +8,47 @@ from fastapi import APIRouter, File, UploadFile, Depends, HTTPException, status,
 from app.models.schemas import ResumeDataSchema, SkillSchema, ExperienceSchema, SkillGapSchema, CoverLetterRequest, CoverLetterResponse
 from app.core.database import get_database
 import pdfplumber
-import google.generativeai as genai
+from dotenv import load_dotenv
+from google import genai
+from google.genai import types
+
+# Load .env before reading any env vars
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/resume", tags=["resume"])
 
 # Initialize the Gemini SDK (Requires GEMINI_API_KEY in environment variables)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "mock-key-replace-in-production")
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+IS_MOCK_MODE = not GEMINI_API_KEY or GEMINI_API_KEY.startswith("mock")
 
-# Flag: skip real API calls in offline/dev mode
-IS_MOCK_MODE = GEMINI_API_KEY == "mock-key-replace-in-production"
+_gemini_client: genai.Client | None = None
+
+def get_gemini_client() -> genai.Client:
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
+
+
+def extract_json(text: str) -> dict:
+    """
+    Robustly parse JSON from a Gemini response.
+    Handles markdown fences (```json), extra whitespace, and partial wrappers.
+    """
+    text = text.strip()
+    text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'```\s*$', '', text)
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    # Fallback: extract first {...} block
+    m = re.search(r'\{[\s\S]+\}', text)
+    if m:
+        return json.loads(m.group(0))
+    raise ValueError(f"No valid JSON in Gemini response: {text[:200]}")
 
 
 def calculate_ats_score(gemini_json: dict) -> int:
@@ -330,22 +360,25 @@ async def upload_resume(
     )
 
     if IS_MOCK_MODE:
-        logger.info("Mock API key detected — generating mock parsed resume data locally.")
+        logger.info("No Gemini API key — generating mock parsed resume data locally.")
         gemini_json = generate_mock_resume_data(raw_text)
     else:
         try:
-            # 2. Pass the raw text block directly to the Gemini API utilizing structured outputs
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(
-                f"SYSTEM INSTRUCTION:\n{system_instruction}\n\nRESUME TEXT TO PARSE:\n{raw_text}",
-                generation_config=genai.GenerationConfig(
+            # 2. Pass the raw text block directly to Gemini 1.5 Flash for structured parsing
+            client = get_gemini_client()
+            response = client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=f"SYSTEM INSTRUCTION:\n{system_instruction}\n\nRESUME TEXT TO PARSE:\n{raw_text}",
+                config=types.GenerateContentConfig(
                     response_mime_type="application/json"
                 )
             )
-            gemini_json = json.loads(response.text)
+            gemini_json = extract_json(response.text)
         except Exception as e:
-            logger.error(f"Gemini API structural extraction failure: {e}")
-            raise HTTPException(status_code=502, detail="Failed to structurally parse resume via AI subsystem.")
+            logger.error(f"Gemini API failure ({type(e).__name__}): {e}")
+            logger.warning("Falling back to heuristic resume parsing (mock data).")
+            # Graceful fallback — never return 502 to the user
+            gemini_json = generate_mock_resume_data(raw_text)
 
     # 3. Execute a local heuristic rule-based processing step for ATS structural metric score
     extracted_experience = gemini_json.get("experience", [])
@@ -377,7 +410,8 @@ async def upload_resume(
         "skills": flattened_skills,  # Full deduplicated skill list with Gemini-assigned confidence scores
         "experience": extracted_experience,
         "gaps": parsed_gaps,
-        "ats_score": ats_score
+        "ats_score": ats_score,
+        "raw_text": raw_text  # Full extracted text for downstream ATS analysis
     }
 
     # 5. Asynchronous metadata logging to MongoDB Atlas with embeddings
@@ -398,12 +432,12 @@ async def upload_resume(
             # Generate and store vector embeddings asynchronously
             if not IS_MOCK_MODE:
                 try:
-                    embedding_result = genai.embed_content(
-                        model="models/text-embedding-004",
-                        content=raw_text[:8000],  # Truncate to avoid token limits
-                        task_type="retrieval_document"
+                    client = get_gemini_client()
+                    embedding_result = client.models.embed_content(
+                        model="text-embedding-004",
+                        contents=raw_text[:8000],
                     )
-                    resume_embeddings = embedding_result['embedding']
+                    resume_embeddings = embedding_result.embeddings[0].values
                     await db["resumes"].update_one(
                         {"_id": mongo_id},
                         {"$set": {"resume_embeddings": resume_embeddings}}
@@ -415,6 +449,107 @@ async def upload_resume(
             logger.error(f"Failed to commit parsed resume data to MongoDB Atlas: {e}")
 
     return parsed_data
+
+
+@router.post("/streamlit/analyze")
+async def streamlit_analyze(
+    file: UploadFile = File(...),
+    job_description: str = Body(..., embed=True)
+):
+    """Endpoint adapted from the provided Streamlit code: returns Gemini analysis or a mock fallback."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in (".pdf", ".docx"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only PDF and DOCX supported")
+
+    file_bytes = await file.read()
+    raw_text = ""
+    if ext == ".pdf":
+        if pdfplumber is None:
+            # attempt simple fallback: try decode as text
+            try:
+                raw_text = file_bytes.decode(errors="ignore")
+            except Exception:
+                raw_text = ""
+        else:
+            try:
+                with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                    for page in pdf.pages:
+                        t = page.extract_text()
+                        if t:
+                            raw_text += t + "\n"
+            except Exception as e:
+                logger.error(f"PDF parse failed in streamlit_analyze: {e}")
+    else:
+        raw_text = extract_text_from_docx(file_bytes)
+
+    if not raw_text.strip():
+        # fallback to mock generator
+        gemini_json = generate_mock_resume_data("")
+        return {"response": "No readable text; returning mock analysis.", "mock": gemini_json}
+
+    # Compose prompt similar to Streamlit
+    prompt = (
+        "You are an experienced Technical Human Resource Manager, your task is to review the provided resume against the job description. "
+        "Please share your professional evaluation on whether the candidate's profile aligns with the role. Highlight strengths and weaknesses."
+    )
+
+    if genai is None:
+        logger.warning("Gemini client not available; returning mock analysis.")
+        gemini_json = generate_mock_resume_data(raw_text)
+        return {"response": "Gemini not available; returning mock analysis.", "mock": gemini_json}
+
+    try:
+        client = get_gemini_client()
+        # Use a text-first approach: include job description and extracted resume text
+        contents = f"SYSTEM INSTRUCTION:\n{prompt}\n\nJOB DESCRIPTION:\n{job_description}\n\nRESUME TEXT:\n{raw_text}"
+        cfg = None
+        if types is not None:
+            try:
+                cfg = types.GenerateContentConfig(response_mime_type="text/plain")
+            except Exception:
+                cfg = None
+
+        if cfg is not None:
+            resp = client.models.generate_content(model="gemini-pro-vision", contents=contents, config=cfg)
+        else:
+            resp = client.models.generate_content(model="gemini-pro-vision", contents=contents)
+
+        text_out = getattr(resp, "text", None) or getattr(resp, "output", None) or str(resp)
+        return {"response": text_out}
+    except Exception as e:
+        logger.error(f"Gemini call failed in streamlit_analyze: {e}")
+        gemini_json = generate_mock_resume_data(raw_text)
+        return {"response": "Gemini call failed; returning mock analysis.", "mock": gemini_json}
+
+
+@router.post("/streamlit/match")
+async def streamlit_match(
+    file: UploadFile = File(...),
+    job_description: str = Body(..., embed=True)
+):
+    """Return a percentage match and missing keywords similar to the Streamlit sample."""
+    # Reuse the analyze flow to get text
+    result = await streamlit_analyze(file=file, job_description=job_description)
+    # If we received a Gemini text response, attempt to parse numeric percentage
+    text = result.get("response", "") if isinstance(result, dict) else str(result)
+    # Heuristic extraction of percentage
+    m = re.search(r"(\d{1,3})\s*%", text)
+    if m:
+        pct = int(m.group(1))
+    else:
+        # fallback: compute simple overlap score
+        jd_terms = set(re.findall(r"\w+", job_description.lower()))
+        # Extract skills from mock or parsed result
+        skills = []
+        if isinstance(result, dict) and "mock" in result:
+            skills = [s.get("name", "") for s in result["mock"].get("skills", [])]
+        else:
+            skills = re.findall(r"\w+", text.lower())[:50]
+
+        common = jd_terms.intersection({s.lower() for s in skills})
+        pct = int(min(100, (len(common) / max(1, len(jd_terms))) * 100))
+
+    return {"match_percentage": pct, "raw_response": text}
 
 
 @router.post("/cover_letter", response_model=CoverLetterResponse)
@@ -462,8 +597,11 @@ async def generate_cover_letter(payload: CoverLetterRequest):
     )
 
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(prompt)
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+        )
         cover_letter = response.text.strip()
         logger.info(f"Cover letter generated successfully for {payload.resume.name}")
         return CoverLetterResponse(cover_letter=cover_letter)
