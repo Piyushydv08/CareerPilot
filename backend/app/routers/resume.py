@@ -531,7 +531,8 @@ async def streamlit_match(
     # Reuse the analyze flow to get text
     result = await streamlit_analyze(file=file, job_description=job_description)
     # If we received a Gemini text response, attempt to parse numeric percentage
-    text = result.get("response", "") if isinstance(result, dict) else str(result)
+    raw_response = result.get("response", "") if isinstance(result, dict) else ""
+    text: str = str(raw_response)
     # Heuristic extraction of percentage
     m = re.search(r"(\d{1,3})\s*%", text)
     if m:
@@ -540,9 +541,13 @@ async def streamlit_match(
         # fallback: compute simple overlap score
         jd_terms = set(re.findall(r"\w+", job_description.lower()))
         # Extract skills from mock or parsed result
-        skills = []
+        skills: list[str] = []
         if isinstance(result, dict) and "mock" in result:
-            skills = [s.get("name", "") for s in result["mock"].get("skills", [])]
+            skills = [
+                str(s.get("name", ""))
+                for s in result["mock"].get("skills", [])
+                if isinstance(s, dict)
+            ]
         else:
             skills = re.findall(r"\w+", text.lower())[:50]
 

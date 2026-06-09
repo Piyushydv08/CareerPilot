@@ -4,7 +4,7 @@ import uuid
 import logging
 import json
 import spacy
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -107,9 +107,9 @@ async def start_interview(
                 "status": "ongoing",
                 "job_description": payload.job_description,
                 "resume_data": payload.resume.model_dump(),
-                "created_at": datetime.utcnow(),
+                "created_at": datetime.now(timezone.utc),
                 "message_history": [
-                    {"sender": "SYSTEM", "timestamp": datetime.utcnow().isoformat(), "text": initial_question}
+                    {"sender": "SYSTEM", "timestamp": datetime.now(timezone.utc).isoformat(), "text": initial_question}
                 ]
             }
             await db["interview_sessions"].insert_one(session_record)
@@ -209,8 +209,8 @@ async def respond_interview(
                     "$push": {
                         "message_history": {
                             "$each": [
-                                {"sender": "USER", "timestamp": datetime.utcnow().isoformat(), "text": payload.response},
-                                {"sender": "SYSTEM", "timestamp": datetime.utcnow().isoformat(), "text": reply}
+                                {"sender": "USER", "timestamp": datetime.now(timezone.utc).isoformat(), "text": payload.response},
+                                {"sender": "SYSTEM", "timestamp": datetime.now(timezone.utc).isoformat(), "text": reply}
                             ]
                         }
                     },

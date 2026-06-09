@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo import DESCENDING, ASCENDING
 from pymongo.errors import ConnectionFailure, OperationFailure
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
-    client: AsyncIOMotorClient = None
+    client: Optional[AsyncIOMotorClient] = None
     db = None
 
     async def connect_to_database(self) -> None:

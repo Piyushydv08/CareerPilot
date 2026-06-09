@@ -273,9 +273,9 @@ async def get_market_trends(
         hybrid_mask = df_filtered['description'].str.contains('hybrid', case=False, na=False) & ~remote_mask
         onsite_mask = ~remote_mask & ~hybrid_mask
         
-        remote_count = int(remote_mask.sum())
-        hybrid_count = int(hybrid_mask.sum())
-        onsite_count = int(onsite_mask.sum())
+        remote_count = int(remote_mask.sum())  # type: ignore[arg-type]
+        hybrid_count = int(hybrid_mask.sum())  # type: ignore[arg-type]
+        onsite_count = int(onsite_mask.sum())  # type: ignore[arg-type]
         
         work_model_ratio = {
             "Remote": int((remote_count / total_live_jobs) * 100) if total_live_jobs > 0 else 0,

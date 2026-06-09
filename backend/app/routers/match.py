@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from dotenv import load_dotenv
 from google import genai
@@ -346,7 +346,7 @@ async def analyze_match_score(
     if db is not None:
         try:
             await db["detailed_ats_logs"].insert_one({
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(timezone.utc),
                 "job_description_snippet": job_description[:200],
                 "detailed_result": detailed_result,
                 "is_ai_powered": is_ai_powered
