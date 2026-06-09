@@ -1,9 +1,10 @@
-# app/routers/match.py (updated)
+# app/routers/match.py
 
 import json
 import logging
 import os
 import re
+import httpx
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from dotenv import load_dotenv
@@ -23,8 +24,9 @@ from app.core.database import get_database
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/match", tags=["matching"])
 
+# ── Gemini (kept for detailed ATS analysis) ───────────────────────────────────
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-IS_MOCK_MODE = not GEMINI_API_KEY or GEMINI_API_KEY.startswith("mock")
+IS_GEMINI_MOCK = not GEMINI_API_KEY or GEMINI_API_KEY.startswith("mock")
 
 _gemini_client: genai.Client | None = None
 
@@ -34,8 +36,97 @@ def get_gemini_client() -> genai.Client:
         _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     return _gemini_client
 
+# ── Groq / Llama (for JD skill extraction) ───────────────────────────────────
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+IS_GROQ_MOCK = not bool(GROQ_API_KEY)
+
+
+async def call_llama(system_prompt: str, user_content: str) -> str:  # Groq llama-3.3-70b inference
+    msgs = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_content}]
+    payload = {"model": "llama-3.3-70b-versatile", "messages": msgs, "temperature": 0.1, "max_tokens": 2048}
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    client = httpx.AsyncClient(timeout=30.0)
+    response = await client.post(GROQ_BASE_URL, headers=headers, json=payload)
+    await client.aclose()
+    data = response.json()
+    return str(data["choices"][0]["message"]["content"]).strip()
+
+
+# ── JD skill-extraction prompt (per ATS redesign spec) ───────────────────────
+JD_SKILL_EXTRACTION_PROMPT = """You are an ATS job description parser.
+
+Extract ONLY technical skills, technologies, frameworks, cloud services, databases, tools, programming languages and certifications explicitly required by the job description.
+
+Return ONLY valid JSON.
+
+Format:
+{
+  "skills": [
+    "React",
+    "Node.js",
+    "AWS",
+    "Docker"
+  ]
+}
+
+No explanations.
+No markdown.
+No confidence scores.
+No additional text."""
+
+
+# ── Skill normalization map (canonical names) ─────────────────────────────────
+SKILL_NORM_MAP: dict[str, str] = {
+    "react": "React", "react.js": "React",
+    "node": "Node.js", "nodejs": "Node.js", "node.js": "Node.js",
+    "mongodb": "MongoDB", "mongo": "MongoDB",
+    "aws": "AWS", "amazon web services": "AWS", "aws ec2": "AWS",
+    "gcp": "GCP", "google cloud": "GCP", "google cloud platform": "GCP",
+    "azure": "Azure", "microsoft azure": "Azure",
+    "javascript": "JavaScript", "js": "JavaScript",
+    "typescript": "TypeScript", "ts": "TypeScript",
+    "docker": "Docker",
+    "kubernetes": "Kubernetes", "k8s": "Kubernetes",
+    "graphql": "GraphQL",
+    "postgresql": "PostgreSQL", "postgres": "PostgreSQL",
+    "mysql": "MySQL", "redis": "Redis", "git": "Git",
+    "vue": "Vue.js", "vue.js": "Vue.js",
+    "angular": "Angular",
+    "next.js": "Next.js", "nextjs": "Next.js",
+    "express": "Express.js", "express.js": "Express.js",
+    "django": "Django", "flask": "Flask", "fastapi": "FastAPI",
+    "java": "Java", "kotlin": "Kotlin", "swift": "Swift",
+    "go": "Go", "golang": "Go", "rust": "Rust",
+    "html": "HTML", "html5": "HTML", "css": "CSS", "css3": "CSS",
+    "tailwind": "Tailwind CSS", "tailwindcss": "Tailwind CSS",
+    "jenkins": "Jenkins", "terraform": "Terraform", "ansible": "Ansible",
+    "kafka": "Apache Kafka", "elasticsearch": "Elasticsearch",
+    "nginx": "Nginx", "linux": "Linux", "python": "Python",
+    "ci/cd": "CI/CD", "rest": "REST APIs", "rest api": "REST APIs", "restful": "REST APIs",
+    "c++": "C++", "cpp": "C++", "c#": "C#", "csharp": "C#",
+}
+
+
+def normalize_skill(skill: str) -> str:  # Return canonical name or title-cased original
+    return SKILL_NORM_MAP.get(skill.lower().strip(), skill.strip())
+
+
+def deduplicate_skills(skills: list[str]) -> list[str]:
+    """Remove duplicates from a skill list, case-insensitively, preserving first occurrence."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for skill in skills:
+        normalized = skill.strip().lower()
+        if normalized not in seen:
+            seen.add(normalized)
+            result.append(skill.strip())
+    return result
+
+
+
 def extract_json(text: str) -> dict:
-    """Robustly extract JSON from Gemini response (handles markdown fences)."""
+    """Robustly extract JSON from a model response (handles markdown fences)."""
     text = text.strip()
     text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
     text = re.sub(r'```\s*$', '', text)
@@ -43,10 +134,11 @@ def extract_json(text: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        match = re.search(r'\{[\s\S]+\}', text)
+        match = re.search(r'[\[{][\s\S]+[\]}]', text)
         if match:
             return json.loads(match.group(0))
         raise ValueError(f"No valid JSON: {text[:200]}")
+
 
 # ----------------------------------------------------------------------
 # New detailed ATS prompt (supports both JD-present and JD-missing cases)
@@ -185,7 +277,7 @@ def run_detailed_ats_analysis(resume_text: str, job_description: str) -> dict:
             temperature=0.2,
         ),
     )
-    return extract_json(response.text)
+    return extract_json(response.text or "")
 
 # ----------------------------------------------------------------------
 # Heuristic fallback (simplified version to match new schema)
@@ -285,6 +377,7 @@ async def analyze_match_score(
     """
     Enhanced ATS analysis that returns both the new detailed schema and
     the legacy fields required by the current frontend.
+    Also runs Llama-based JD skill extraction to produce gap_skills.
     """
     # Build resume text from payload
     resume_text = (payload.resume_raw_text or "").strip()
@@ -304,9 +397,9 @@ async def analyze_match_score(
 
     job_description = payload.job_description.strip()
 
-    # Run detailed analysis (Gemini or fallback)
+    # ── Run detailed ATS analysis (Gemini or fallback) ────────────────────────
     try:
-        if not IS_MOCK_MODE:
+        if not IS_GEMINI_MOCK:
             detailed_result = run_detailed_ats_analysis(resume_text, job_description)
         else:
             detailed_result = fallback_detailed_analysis(resume_text, job_description, payload.resume)
@@ -318,9 +411,45 @@ async def analyze_match_score(
     ats = detailed_result.get("ats_analysis", {})
     resume_data_parsed = detailed_result.get("resume_data", {})
 
-    # Build legacy response structure (for current frontend)
+    # ── Call B: JD skill extraction via Llama ─────────────────────────────────
+    jd_skills: list[str] = []
+    if job_description and not IS_GROQ_MOCK:
+        try:
+            raw_jd_response = await call_llama(JD_SKILL_EXTRACTION_PROMPT, job_description[:5000])
+            parsed_jd = extract_json(raw_jd_response)
+            # New prompt returns {"skills": [...]}, old prompt returns [...]
+            if isinstance(parsed_jd, dict) and "skills" in parsed_jd:
+                raw_list = parsed_jd["skills"]
+            elif isinstance(parsed_jd, list):
+                raw_list = parsed_jd
+            else:
+                raw_list = []
+            jd_skills = [normalize_skill(str(s)) for s in raw_list if isinstance(s, str)]
+            logger.info(f"Llama extracted {len(jd_skills)} JD skills.")
+        except Exception as e:
+            logger.error(f"Llama JD skill extraction failed: {e}")
+            jd_skills = [normalize_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])]
+    elif job_description and IS_GROQ_MOCK:
+        jd_skills = [normalize_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])]
+
+    # ── Resume skills: prefer Gemini's technical_skills, fall back to payload skills ──
+    raw_resume_skills: list[str] = []
+    parsed_tech = resume_data_parsed.get("technical_skills", [])
+    if isinstance(parsed_tech, list) and parsed_tech:
+        raw_resume_skills = [str(s) for s in parsed_tech if isinstance(s, str)]
+    elif payload.resume and payload.resume.skills:
+        raw_resume_skills = [s.name for s in payload.resume.skills]
+    resume_skills = [normalize_skill(s) for s in raw_resume_skills]
+
+    # ── Set-difference gap computation ───────────────────────────────────────
+    resume_set = {s.lower() for s in resume_skills}
+    jd_lower_map = {s.lower(): s for s in jd_skills}  # lowercase → canonical
+    missing_skills = [jd_lower_map[k] for k in jd_lower_map if k not in resume_set]
+    matched_skills = [jd_lower_map[k] for k in jd_lower_map if k in resume_set]
+
+    # ── Build legacy response structure (for current frontend) ────────────────
     match_score = ats.get("ats_score", 0)
-    is_ai_powered = not IS_MOCK_MODE
+    is_ai_powered = not IS_GEMINI_MOCK
 
     # Map category scores (from new schema to old 5 categories)
     category_scores = ATSCategoryScores(
@@ -331,31 +460,52 @@ async def analyze_match_score(
         formatting_completeness=ats.get("formatting_score", 50),
     )
 
-    # Use matched_skills/missing_skills for keyword lists if JD provided,
-    # otherwise use matching_keywords/missing_keywords
-    if ats.get("job_description_provided"):
-        matched_keywords = ats.get("matched_skills", []) + ats.get("matching_keywords", [])
-        missing_keywords = ats.get("missing_skills", []) + ats.get("missing_keywords", [])
+    # Use ONLY the set-difference computed matched_skills/missing_skills for keyword lists.
+    # This guarantees the displayed keywords are strictly JD ∩ Resume and JD − Resume,
+    # never generic AI-recommended skills from Gemini's analysis.
+    if jd_skills:
+        # JD skills were extracted — use the set-diff results exclusively
+        matched_keywords = deduplicate_skills(matched_skills)
+        missing_keywords = deduplicate_skills(missing_skills)
+    elif ats.get("job_description_provided"):
+        # Fallback to Gemini analysis fields when Groq JD extraction was unavailable
+        matched_keywords = deduplicate_skills(ats.get("matched_skills", []) + ats.get("matching_keywords", []))
+        missing_keywords = deduplicate_skills(ats.get("missing_skills", []) + ats.get("missing_keywords", []))
     else:
-        matched_keywords = ats.get("matching_keywords", [])
-        missing_keywords = ats.get("missing_keywords", [])
+        matched_keywords = deduplicate_skills(ats.get("matching_keywords", []))
+        missing_keywords = deduplicate_skills(ats.get("missing_keywords", []))
 
     suggestions = ats.get("recommendations", [])
 
-    # Persist the detailed result in DB for future UI enhancements
+    # ── Deduplicate all skill lists before returning ──────────────────────────
+    resume_skills = deduplicate_skills(resume_skills)
+    jd_skills = deduplicate_skills(jd_skills)
+    matched_skills = deduplicate_skills(matched_skills)
+    missing_skills = deduplicate_skills(missing_skills)
+    matched_keywords = deduplicate_skills(matched_keywords)
+    missing_keywords = deduplicate_skills(missing_keywords)
+
+    # ── Debug logging to verify the ATS calculation pipeline ─────────────────
+    print("RESUME SKILLS:", resume_skills)
+    print("JD SKILLS:", jd_skills)
+    print("MATCHED SKILLS:", matched_skills)
+    print("MISSING SKILLS:", missing_skills)
+
+    # ── Persist the detailed result in DB ─────────────────────────────────────
     if db is not None:
         try:
             await db["detailed_ats_logs"].insert_one({
                 "timestamp": datetime.now(timezone.utc),
                 "job_description_snippet": job_description[:200],
                 "detailed_result": detailed_result,
-                "is_ai_powered": is_ai_powered
+                "is_ai_powered": is_ai_powered,
+                "jd_skills": jd_skills,
+                "missing_skills": missing_skills,  # fixed: was referencing undefined gap_skills
             })
         except Exception as e:
             logger.warning(f"Failed to store detailed ATS log: {e}")
 
-    # Return legacy response with extra field "_detailed" that can be used later
-    response = MatchAnalysisResponse(
+    return MatchAnalysisResponse(
         match_score=match_score,
         category_scores=category_scores,
         matched_keywords=matched_keywords[:15],
@@ -363,7 +513,9 @@ async def analyze_match_score(
         suggestions=suggestions[:5],
         missing_terms=[],
         is_ai_powered=is_ai_powered,
+        resume_skills=resume_skills,
+        jd_skills=jd_skills,
+        matched_skills=matched_skills,
+        missing_skills=missing_skills,
+        gap_skills=missing_skills,  # backward compat alias
     )
-    # Attach the full detailed result as a custom field (not in schema, but accessible in frontend)
-    response._detailed = detailed_result   # type: ignore
-    return response

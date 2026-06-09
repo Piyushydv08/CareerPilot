@@ -183,7 +183,7 @@ export default function SimulatorPage() {
 
                 {/* Weaknesses */}
                 <div>
-                  <span className="text-[10px] text-on-surface-variant block mb-2 font-semibold">Gaps Unfulfilled</span>
+                  <span className="text-[10px] text-on-surface-variant block mb-2 font-semibold">Missing from JD</span>
                   <div className="flex flex-wrap gap-1.5">
                     {resumeData?.gaps.filter(g => !g.checked).map(gap => (
                       <span 
@@ -195,7 +195,9 @@ export default function SimulatorPage() {
                     ))}
                     {resumeData?.gaps.filter(g => !g.checked).length === 0 && (
                       <span className="text-[10px] text-cyber-blue italic font-semibold">
-                        All critical gaps simulated as fulfilled!
+                        {resumeData?.gaps.length === 0
+                          ? "Analyze a job description to see missing skills."
+                          : "All missing JD skills simulated as fulfilled!"}
                       </span>
                     )}
                   </div>
@@ -214,7 +216,7 @@ export default function SimulatorPage() {
                   Predictive Gap Checklist
                 </h3>
                 <p className="text-xs text-on-surface-variant font-mono">
-                  Toggle nodes to index simulated compatibility adjustments.
+                  These are skills required by the job description not found in your resume. Toggle to simulate score impact.
                 </p>
               </div>
               <span className="font-mono text-[10px] text-cyber-blue bg-cyber-blue/5 border border-cyber-blue/20 rounded px-2.5 py-0.5 uppercase tracking-wider shrink-0">

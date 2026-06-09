@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Adzuna API credentials
     ADZUNA_APP_ID: Optional[str] = None
     ADZUNA_APP_KEY: Optional[str] = None
+
+    # Groq API key for Llama inference
+    GROQ_API_KEY: Optional[str] = None
     
     model_config = SettingsConfigDict(
         env_file=".env",

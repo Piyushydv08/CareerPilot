@@ -60,6 +60,11 @@ class MatchAnalysisResponse(BaseModel):
     suggestions: List[str] = Field(default_factory=list)
     missing_terms: List[MissingTerm] = Field(default_factory=list)  # Kept for backward compat
     is_ai_powered: bool = False
+    resume_skills: List[str] = Field(default_factory=list)   # Skills extracted from resume
+    jd_skills: List[str] = Field(default_factory=list)        # Skills required by JD
+    matched_skills: List[str] = Field(default_factory=list)   # jd_skills ∩ resume_skills
+    missing_skills: List[str] = Field(default_factory=list)   # jd_skills − resume_skills
+    gap_skills: List[str] = Field(default_factory=list)       # Alias of missing_skills (backward compat)
 
 # --- Interview Models ---
 class InterviewStartRequest(BaseModel):

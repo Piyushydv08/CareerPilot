@@ -3,14 +3,13 @@ import io
 import json
 import re
 import logging
+import httpx
 from datetime import datetime, timezone
 from fastapi import APIRouter, File, UploadFile, Depends, HTTPException, status, Body
 from app.models.schemas import ResumeDataSchema, SkillSchema, ExperienceSchema, SkillGapSchema, CoverLetterRequest, CoverLetterResponse
 from app.core.database import get_database
 import pdfplumber
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 # Load .env before reading any env vars
 load_dotenv()
@@ -18,48 +17,67 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/resume", tags=["resume"])
 
-# Initialize the Gemini SDK (Requires GEMINI_API_KEY in environment variables)
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-IS_MOCK_MODE = not GEMINI_API_KEY or GEMINI_API_KEY.startswith("mock")
-
-_gemini_client: genai.Client | None = None
-
-def get_gemini_client() -> genai.Client:
-    global _gemini_client
-    if _gemini_client is None:
-        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-    return _gemini_client
+# ── Groq / Llama configuration ────────────────────────────────────────────────
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_BASE_URL = "https://api.groq.com/openai/v1/chat/completions"
+IS_MOCK_MODE = not bool(GROQ_API_KEY)
 
 
-def extract_json(text: str) -> dict:
-    """
-    Robustly parse JSON from a Gemini response.
-    Handles markdown fences (```json), extra whitespace, and partial wrappers.
-    """
+async def call_llama(system_prompt: str, user_content: str) -> str:  # Groq llama-3.3-70b-versatile inference
+    msgs = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_content}]
+    payload = {"model": "llama-3.3-70b-versatile", "messages": msgs, "temperature": 0.1, "max_tokens": 2048}
+    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    client = httpx.AsyncClient(timeout=30.0)
+    response = await client.post(GROQ_BASE_URL, headers=headers, json=payload)
+    await client.aclose()
+    data = response.json()
+    return str(data["choices"][0]["message"]["content"]).strip()
+
+
+# ── JSON extraction helper ─────────────────────────────────────────────────────
+from typing import Any
+def extract_json(text: str) -> Any:  # Strip markdown fences and parse JSON from model response
     text = text.strip()
     text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'```\s*$', '', text)
-    text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-    # Fallback: extract first {...} block
-    m = re.search(r'\{[\s\S]+\}', text)
+    text = re.sub(r'```\s*$', '', text).strip()
+    loaded = _try_json_loads(text)
+    if loaded is not None:
+        return loaded
+    m = re.search(r'[\[{][\s\S]+[\]}]', text)
     if m:
-        return json.loads(m.group(0))
-    raise ValueError(f"No valid JSON in Gemini response: {text[:200]}")
+        return _try_json_loads(m.group(0)) or json.loads(m.group(0))
+    raise ValueError(f"No valid JSON in Llama response: {text[:200]}")
 
 
-def calculate_ats_score(gemini_json: dict) -> int:
-    """
-    Multi-dimensional ATS score (0-100) across five weighted pillars:
-      1. Contact Information Completeness  — up to 10 pts
-      2. Skills Breadth and Depth          — up to 25 pts
-      3. Experience Quality                — up to 35 pts
-      4. Resume Sections Completeness      — up to 15 pts
-      5. Experience Diversity              — up to 15 pts
-    """
+def _try_json_loads(text: str) -> dict | list | None:  # Returns parsed object or None — never raises
+    if not text or text[0] not in ("{", "["):
+        return None
+    import contextlib; result: dict | list | None = None; ctx = contextlib.suppress(Exception)  # noqa: E702
+    with ctx: result = json.loads(text)  # noqa: E701
+    return result
+
+
+# ── Resume skill-extraction system prompt ─────────────────────────────────────
+RESUME_SKILL_EXTRACTION_PROMPT = """\
+You are a precise technical skill extraction engine for a career intelligence platform.
+
+Your task: Extract ONLY technical skills from resume text. Return a JSON array of skill objects.
+
+Rules:
+- Include frameworks, languages, libraries, tools, platforms, cloud services, databases, protocols, and methodologies that are explicitly mentioned OR clearly implied by project/work descriptions.
+- IMPLICIT SKILLS: If the text says "built an API with Express.js" → include Express.js, Node.js, REST API Design. If "deployed on AWS EC2" → include AWS, EC2. If "used Socket.IO" → include Socket.IO, Real-Time Systems.
+- EXCLUDE: soft skills, generic terms (e.g. "communication", "teamwork", "problem solving", "leadership"), and non-technical certifications.
+- DEDUPLICATE: React and React.js → React.js. MongoDB and Mongo → MongoDB.
+- CONFIDENCE scoring: 90-100 = used heavily across multiple projects; 70-89 = clearly used in at least one project; 50-69 = listed in skills section only; 30-49 = implied/inferred.
+- Use canonical industry-standard names: "Node.js" not "nodejs", "PostgreSQL" not "postgres".
+- Be exhaustive — extract every technical skill with any evidence.
+
+Return ONLY a raw JSON array. No markdown, no explanation, no surrounding text.
+Format: [{"name": "React.js", "confidence": 92}, {"name": "Node.js", "confidence": 88}, ...]
+"""
+
+
+def calculate_ats_score(gemini_json: dict) -> int:  # Multi-dimensional ATS score (0-100) across five weighted pillars
     total = 0
 
     # ── 1. Contact Information Completeness (10 pts) ──────────────────────────
@@ -149,7 +167,6 @@ def calculate_ats_score(gemini_json: dict) -> int:
     return max(0, min(total, 100))
 
 
-
 def extract_text_from_docx(file_bytes: bytes) -> str:
     """Extract plain text from a .docx file using python-docx."""
     try:
@@ -161,7 +178,6 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     except Exception as e:
         logger.error(f"Failed to extract text from DOCX: {e}")
         raise HTTPException(status_code=500, detail="Failed to parse DOCX content stream.")
-
 
 
 def generate_mock_resume_data(raw_text: str) -> dict:
@@ -181,20 +197,20 @@ def generate_mock_resume_data(raw_text: str) -> dict:
 
     # Extract skills by checking presence of common tech terms in text
     tech_keywords = [
-        "React", "React.js", "TypeScript", "JavaScript", "Node.js", "Node", "GraphQL", 
-        "Python", "Django", "Flask", "AWS", "Docker", "Kubernetes", "PostgreSQL", 
+        "React", "React.js", "TypeScript", "JavaScript", "Node.js", "Node", "GraphQL",
+        "Python", "Django", "Flask", "AWS", "Docker", "Kubernetes", "PostgreSQL",
         "MongoDB", "SQL", "Git", "CI/CD", "Next.js", "Express", "HTML", "CSS"
     ]
     detected_skills = []
     text_lower = raw_text.lower()
-    
+
     for tech in tech_keywords:
         pattern = r'\b' + re.escape(tech.lower()) + r'\b'
         if re.search(pattern, text_lower):
             # Assign confidence: higher if mentioned multiple times
             confidence = 85 if text_lower.count(tech.lower()) > 1 else 70
             detected_skills.append({"name": tech, "confidence": confidence})
-            
+
     # Default skills if none detected
     if not detected_skills:
         detected_skills = [
@@ -229,7 +245,7 @@ def generate_mock_resume_data(raw_text: str) -> dict:
         {"name": "GraphQL", "category": "API Design", "impact": 7},
         {"name": "Unit Testing", "category": "Testing", "impact": 9}
     ]
-    
+
     gaps = []
     detected_skill_names = {str(s["name"]).lower() for s in detected_skills if isinstance(s, dict) and "name" in s}
     for gap in possible_gaps:
@@ -244,12 +260,12 @@ def generate_mock_resume_data(raw_text: str) -> dict:
                 })
                 if len(gaps) == 4:
                     break
-                    
+
     # Fallback if we didn't get 4 gaps
     while len(gaps) < 4:
         current_gap_names = {str(x["name"]).lower() for x in gaps if isinstance(x, dict) and "name" in x}
         extra_gaps = [
-            g for g in possible_gaps 
+            g for g in possible_gaps
             if isinstance(g, dict) and "name" in g and str(g["name"]).lower() not in current_gap_names
         ]
         if not extra_gaps:
@@ -276,7 +292,7 @@ async def upload_resume(
     file: UploadFile = File(...),
     db = Depends(get_database)
 ):
-    """Multipart parser uploading resume details asynchronously, extracting via pdfplumber/python-docx and Gemini."""
+    """Multipart parser uploading resume details asynchronously, extracting via pdfplumber/python-docx and Llama."""
     logger.info(f"Received resume upload task for file: {file.filename}")
 
     ext = os.path.splitext(file.filename or "")[1].lower()
@@ -306,94 +322,93 @@ async def upload_resume(
     if not raw_text.strip():
         raise HTTPException(status_code=400, detail="No readable text found in the file. Could be an image-only file.")
 
-    # 1. Draft precise constraining system prompt including skill gaps extraction
-    system_instruction = (
-        "You are an expert HR parser and skills extraction system. Extract the following strictly from the raw resume text into this exact JSON schema:\n"
-        "{\n"
-        '  "candidate_name": "string",\n'
-        '  "contact_info": "string (email or phone)",\n'
-        '  "skills": [\n'
-        "    {\n"
-        '      "name": "str (clean skill name, e.g. Node.js, REST API Design, JWT Authentication)",\n'
-        '      "confidence": <integer 1-100>\n'
-        "    }\n"
-        '  ],\n'
-        '  "experience": [\n'
-        "    {\n"
-        '      "company": "str",\n'
-        '      "role": "str",\n'
-        '      "duration": "str",\n'
-        '      "details": "str (bulleted metrics combined)"\n'
-        "    }\n"
-        '  ],\n'
-        '  "gaps": [\n'
-        "    {\n"
-        '      "name": "str (skill gap name)",\n'
-        '      "category": "str (e.g. Cloud, DevOps, API Design, Testing)",\n'
-        '      "impact": <integer between 5 and 15>,\n'
-        '      "checked": false\n'
-        "    }\n"
-        "  ]\n"
-        "}\n"
-        "\n"
-        "SKILLS EXTRACTION RULES — follow all of these precisely:\n"
-        "1. SCAN ALL SECTIONS: Education, Projects, Technical Skills, Work Experience, Achievements, and Certifications for any technology or tool mention.\n"
-        "2. INCLUDE IMPLICIT SKILLS: If the candidate built something using a technology, that technology is a skill — even if it is not listed in a 'Skills' section. "
-        "   Examples: 'built a backend with Node.js and Express.js' → Node.js, Express.js, REST API Design; "
-        "   'implemented JWT-based auth' → JWT Authentication; 'used Socket.IO for real-time messaging' → Socket.IO, Real-Time Systems; "
-        "   'deployed with Docker on AWS' → Docker, AWS; 'styled with Tailwind CSS' → Tailwind CSS.\n"
-        "3. INFER FROM VERBS AND TOOL COMBINATIONS: 'implemented', 'built', 'designed', 'deployed', 'integrated', 'configured' all imply hands-on skill. "
-        "   Infer logical companion skills (e.g., Express.js implies Node.js; Redux implies React.js).\n"
-        "4. DEDUPLICATE: Treat near-duplicates as one skill with the highest applicable confidence "
-        "   (e.g., React and React.js → React.js; Mongo and MongoDB → MongoDB).\n"
-        "5. ASSIGN CONFIDENCE scores as follows:\n"
-        "   - 90-100: Core technology used across multiple projects or central to work experience (e.g., main language, primary framework).\n"
-        "   - 70-89: Used in at least one project or work experience entry with clear evidence.\n"
-        "   - 50-69: Only listed in a skills section without supporting project/experience evidence.\n"
-        "   - 30-49: Tangentially implied or inferred from a related tool — no direct mention.\n"
-        "6. CLEAN NAMES: Use canonical, industry-standard names (e.g., 'Node.js' not 'nodejs', 'REST API Design' not 'restful apis').\n"
-        "7. BE COMPREHENSIVE: Extract every technology that has any evidence of use. Do not limit the list.\n"
-        "\n"
-        "For the 'gaps' array: identify the top 4 most impactful skill gaps based on what is missing or weak compared to modern industry standards for the candidate's apparent role level. "
-        "Each gap must have a unique name, a category, and an impact integer between 5 and 15 (higher = more critical). "
-        "Return ONLY the raw JSON output without any markdown formatting or surrounding text."
-    )
-
+    # 2. Run Llama skill extraction (Call A — resume)
     if IS_MOCK_MODE:
-        logger.info("No Gemini API key — generating mock parsed resume data locally.")
+        logger.info("No Groq API key — generating mock parsed resume data locally.")
+        llama_skills: list = generate_mock_resume_data(raw_text).get("skills", [])
         gemini_json = generate_mock_resume_data(raw_text)
     else:
+        # ── Call A: Resume skill extraction via Llama ─────────────────────────
         try:
-            # 2. Pass the raw text block directly to Gemini 1.5 Flash for structured parsing
-            client = get_gemini_client()
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=f"SYSTEM INSTRUCTION:\n{system_instruction}\n\nRESUME TEXT TO PARSE:\n{raw_text}",
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json"
-                )
+            raw_llama_response = await call_llama(
+                system_prompt=RESUME_SKILL_EXTRACTION_PROMPT,
+                user_content=raw_text[:6000],
             )
-            gemini_json = extract_json(response.text)
+            parsed_llama = extract_json(raw_llama_response)
+            # Normalise: could be a list (expected) or a dict with a key
+            if isinstance(parsed_llama, list):
+                llama_skills = parsed_llama
+            elif isinstance(parsed_llama, dict):
+                # Try common wrapper keys
+                llama_skills = (
+                    parsed_llama.get("skills")
+                    or parsed_llama.get("data")
+                    or list(parsed_llama.values())[0]
+                    if parsed_llama else []
+                )
+            else:
+                llama_skills = []
+            logger.info(f"Llama extracted {len(llama_skills)} skills from resume.")
         except Exception as e:
-            logger.error(f"Gemini API failure ({type(e).__name__}): {e}")
-            logger.warning("Falling back to heuristic resume parsing (mock data).")
-            # Graceful fallback — never return 502 to the user
+            logger.error(f"Llama skill extraction failed: {e}. Falling back to mock data.")
+            llama_skills = generate_mock_resume_data(raw_text).get("skills", [])
+
+        # ── Build a minimal gemini_json-compatible dict from Llama output ─────
+        # (We still need it for calculate_ats_score and experience extraction)
+        # Use a secondary Llama call for the full structured parse (experience, contact, gaps)
+        FULL_PARSE_PROMPT = """\
+You are an expert HR parser. Extract structured data from the raw resume text into this exact JSON schema:
+{
+  "candidate_name": "string",
+  "contact_info": "string (email or phone)",
+  "experience": [
+    {
+      "company": "str",
+      "role": "str",
+      "duration": "str",
+      "details": "str (bulleted metrics combined)"
+    }
+  ],
+  "gaps": [
+    {
+      "name": "str (skill gap name)",
+      "category": "str (e.g. Cloud, DevOps, API Design, Testing)",
+      "impact": <integer between 5 and 15>,
+      "checked": false
+    }
+  ]
+}
+
+For the 'gaps' array: identify the top 4 most impactful skill gaps based on what is missing or weak compared to modern industry standards for the candidate's apparent role level. Each gap must have a unique name, a category, and an impact integer between 5 and 15 (higher = more critical).
+Return ONLY the raw JSON output without any markdown formatting or surrounding text.
+"""
+        try:
+            raw_full_response = await call_llama(
+                system_prompt=FULL_PARSE_PROMPT,
+                user_content=raw_text[:6000],
+            )
+            gemini_json = extract_json(raw_full_response)
+            # Inject the Llama-extracted skills into gemini_json for ATS scoring
+            gemini_json["skills"] = llama_skills
+        except Exception as e:
+            logger.error(f"Llama full parse failed: {e}. Falling back to mock data.")
             gemini_json = generate_mock_resume_data(raw_text)
+            gemini_json["skills"] = llama_skills if llama_skills else gemini_json.get("skills", [])
 
     # 3. Execute a local heuristic rule-based processing step for ATS structural metric score
     extracted_experience = gemini_json.get("experience", [])
     ats_score = calculate_ats_score(gemini_json)
 
-    # Build skills list from the flat array returned by Gemini, using real confidence scores
+    # Build skills list from the Llama-extracted array, using real confidence scores
     flattened_skills = []
-    raw_skills = gemini_json.get("skills", [])
+    raw_skills = llama_skills if not IS_MOCK_MODE else gemini_json.get("skills", [])
     if isinstance(raw_skills, list):
         for item in raw_skills:
             if isinstance(item, dict) and item.get("name"):
                 confidence = max(1, min(100, int(item.get("confidence", 50))))
                 flattened_skills.append({"name": str(item["name"]), "match": confidence})
 
-    # 4. Extract Gemini-generated gaps (top 4, validated)
+    # 4. Extract Llama-generated gaps (top 4, validated)
     raw_gaps = gemini_json.get("gaps", [])
     parsed_gaps = []
     for gap in raw_gaps[:4]:
@@ -407,14 +422,14 @@ async def upload_resume(
     parsed_data = {
         "name": gemini_json.get("candidate_name", "Unknown Candidate"),
         "email": gemini_json.get("contact_info", "No Contact Info Found"),
-        "skills": flattened_skills,  # Full deduplicated skill list with Gemini-assigned confidence scores
+        "skills": flattened_skills,  # Full deduplicated skill list with Llama-assigned confidence scores
         "experience": extracted_experience,
         "gaps": parsed_gaps,
         "ats_score": ats_score,
         "raw_text": raw_text  # Full extracted text for downstream ATS analysis
     }
 
-    # 5. Asynchronous metadata logging to MongoDB Atlas with embeddings
+    # 5. Asynchronous metadata logging to MongoDB Atlas
     if db is not None:
         try:
             document_record = {
@@ -428,23 +443,6 @@ async def upload_resume(
             result = await db["resumes"].insert_one(document_record)
             mongo_id = result.inserted_id
             logger.info(f"Resume metadata inserted to Atlas under index: {mongo_id}")
-
-            # Generate and store vector embeddings asynchronously
-            if not IS_MOCK_MODE:
-                try:
-                    client = get_gemini_client()
-                    embedding_result = client.models.embed_content(
-                        model="text-embedding-004",
-                        contents=raw_text[:8000],
-                    )
-                    resume_embeddings = embedding_result.embeddings[0].values
-                    await db["resumes"].update_one(
-                        {"_id": mongo_id},
-                        {"$set": {"resume_embeddings": resume_embeddings}}
-                    )
-                    logger.info(f"Resume embeddings ({len(resume_embeddings)} dims) stored for document {mongo_id}")
-                except Exception as e:
-                    logger.error(f"Failed to generate/store resume embeddings: {e}")
         except Exception as e:
             logger.error(f"Failed to commit parsed resume data to MongoDB Atlas: {e}")
 
@@ -456,7 +454,7 @@ async def streamlit_analyze(
     file: UploadFile = File(...),
     job_description: str = Body(..., embed=True)
 ):
-    """Endpoint adapted from the provided Streamlit code: returns Gemini analysis or a mock fallback."""
+    """Endpoint adapted from the provided Streamlit code: returns Llama analysis or a mock fallback."""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in (".pdf", ".docx"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only PDF and DOCX supported")
@@ -465,7 +463,6 @@ async def streamlit_analyze(
     raw_text = ""
     if ext == ".pdf":
         if pdfplumber is None:
-            # attempt simple fallback: try decode as text
             try:
                 raw_text = file_bytes.decode(errors="ignore")
             except Exception:
@@ -484,42 +481,28 @@ async def streamlit_analyze(
 
     if not raw_text.strip():
         # fallback to mock generator
-        gemini_json = generate_mock_resume_data("")
-        return {"response": "No readable text; returning mock analysis.", "mock": gemini_json}
+        mock_json = generate_mock_resume_data("")
+        return {"response": "No readable text; returning mock analysis.", "mock": mock_json}
 
     # Compose prompt similar to Streamlit
-    prompt = (
+    system_prompt = (
         "You are an experienced Technical Human Resource Manager, your task is to review the provided resume against the job description. "
         "Please share your professional evaluation on whether the candidate's profile aligns with the role. Highlight strengths and weaknesses."
     )
 
-    if genai is None:
-        logger.warning("Gemini client not available; returning mock analysis.")
-        gemini_json = generate_mock_resume_data(raw_text)
-        return {"response": "Gemini not available; returning mock analysis.", "mock": gemini_json}
+    if IS_MOCK_MODE:
+        logger.warning("No Groq API key — returning mock analysis.")
+        mock_json = generate_mock_resume_data(raw_text)
+        return {"response": "Groq not available; returning mock analysis.", "mock": mock_json}
 
     try:
-        client = get_gemini_client()
-        # Use a text-first approach: include job description and extracted resume text
-        contents = f"SYSTEM INSTRUCTION:\n{prompt}\n\nJOB DESCRIPTION:\n{job_description}\n\nRESUME TEXT:\n{raw_text}"
-        cfg = None
-        if types is not None:
-            try:
-                cfg = types.GenerateContentConfig(response_mime_type="text/plain")
-            except Exception:
-                cfg = None
-
-        if cfg is not None:
-            resp = client.models.generate_content(model="gemini-pro-vision", contents=contents, config=cfg)
-        else:
-            resp = client.models.generate_content(model="gemini-pro-vision", contents=contents)
-
-        text_out = getattr(resp, "text", None) or getattr(resp, "output", None) or str(resp)
+        user_content = f"JOB DESCRIPTION:\n{job_description}\n\nRESUME TEXT:\n{raw_text}"
+        text_out = await call_llama(system_prompt=system_prompt, user_content=user_content)
         return {"response": text_out}
     except Exception as e:
-        logger.error(f"Gemini call failed in streamlit_analyze: {e}")
-        gemini_json = generate_mock_resume_data(raw_text)
-        return {"response": "Gemini call failed; returning mock analysis.", "mock": gemini_json}
+        logger.error(f"Llama call failed in streamlit_analyze: {e}")
+        mock_json = generate_mock_resume_data(raw_text)
+        return {"response": "Llama call failed; returning mock analysis.", "mock": mock_json}
 
 
 @router.post("/streamlit/match")
@@ -530,7 +513,7 @@ async def streamlit_match(
     """Return a percentage match and missing keywords similar to the Streamlit sample."""
     # Reuse the analyze flow to get text
     result = await streamlit_analyze(file=file, job_description=job_description)
-    # If we received a Gemini text response, attempt to parse numeric percentage
+    # If we received a Llama text response, attempt to parse numeric percentage
     raw_response = result.get("response", "") if isinstance(result, dict) else ""
     text: str = str(raw_response)
     # Heuristic extraction of percentage
@@ -542,11 +525,11 @@ async def streamlit_match(
         jd_terms = set(re.findall(r"\w+", job_description.lower()))
         # Extract skills from mock or parsed result
         skills: list[str] = []
-        if isinstance(result, dict) and "mock" in result:
+        if isinstance(result, dict) and isinstance(result.get("mock"), dict):
             skills = [
                 str(s.get("name", ""))
                 for s in result["mock"].get("skills", [])
-                if isinstance(s, dict)
+                if isinstance(s, dict) and "name" in s
             ]
         else:
             skills = re.findall(r"\w+", text.lower())[:50]
@@ -559,7 +542,7 @@ async def streamlit_match(
 
 @router.post("/cover_letter", response_model=CoverLetterResponse)
 async def generate_cover_letter(payload: CoverLetterRequest):
-    """Generate a professional Markdown cover letter using Gemini 1.5 Flash."""
+    """Generate a professional Markdown cover letter using Llama via Groq."""
     logger.info(f"Generating cover letter for: {payload.resume.name}")
 
     # Build experience summary from resume data
@@ -571,7 +554,7 @@ async def generate_cover_letter(payload: CoverLetterRequest):
     top_skills = ", ".join([s.name for s in payload.resume.skills[:6]]) or "Not specified"
 
     if IS_MOCK_MODE:
-        logger.info("Mock API key detected — generating mock cover letter locally.")
+        logger.info("Mock mode detected — generating mock cover letter locally.")
         cover_letter = (
             f"# Cover Letter for {payload.resume.name}\n\n"
             f"Dear Hiring Team,\n\n"
@@ -589,27 +572,24 @@ async def generate_cover_letter(payload: CoverLetterRequest):
         )
         return CoverLetterResponse(cover_letter=cover_letter)
 
-    prompt = (
+    system_prompt = (
+        "You are a professional cover letter writer. Write compelling, specific, and data-driven cover letters in Markdown format. "
+        "Never use cliches like 'I am writing to express' or 'I am passionate about'. "
+        "Start with a compelling hook that references a specific achievement or skill. "
+        "Write exactly 3 paragraphs. Return ONLY the Markdown cover letter text, nothing else."
+    )
+
+    user_content = (
         f"Write a professional cover letter for {payload.resume.name} applying to this role:\n"
         f"{payload.job_description}\n\n"
         f"Their experience: {experience_summary}\n"
-        f"Their top skills: {top_skills}\n\n"
-        "Format in Markdown. Write exactly 3 paragraphs. "
-        "Do not use cliches like 'I am writing to express' or 'I am passionate about'. "
-        "Do not use generic openers. Be specific, confident, and data-driven. "
-        "Start with a compelling hook that references a specific achievement or skill. "
-        "Return ONLY the Markdown cover letter text, nothing else."
+        f"Their top skills: {top_skills}"
     )
 
     try:
-        client = get_gemini_client()
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=prompt,
-        )
-        cover_letter = response.text.strip()
+        cover_letter = await call_llama(system_prompt=system_prompt, user_content=user_content)
         logger.info(f"Cover letter generated successfully for {payload.resume.name}")
         return CoverLetterResponse(cover_letter=cover_letter)
     except Exception as e:
-        logger.error(f"Gemini cover letter generation failed: {e}")
+        logger.error(f"Llama cover letter generation failed: {e}")
         raise HTTPException(status_code=502, detail="Failed to generate cover letter via AI subsystem.")

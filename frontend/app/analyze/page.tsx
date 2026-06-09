@@ -177,9 +177,9 @@ function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
           </div>
           <div className="flex flex-wrap gap-1.5">
             {detail.matched_keywords.length > 0 ? (
-              detail.matched_keywords.map((kw) => (
+              detail.matched_keywords.map((kw, index) => (
                 <span
-                  key={kw}
+                  key={`${kw}-${index}`}
                   className="px-2 py-0.5 text-[10px] font-mono rounded border border-cyber-blue/20 bg-cyber-blue/[0.07] text-cyber-blue"
                 >
                   {kw}
@@ -204,9 +204,9 @@ function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
           </div>
           <div className="flex flex-wrap gap-1.5">
             {detail.missing_keywords.length > 0 ? (
-              detail.missing_keywords.map((kw) => (
+              detail.missing_keywords.map((kw, index) => (
                 <span
-                  key={kw}
+                  key={`${kw}-${index}`}
                   className="px-2 py-0.5 text-[10px] font-mono rounded border border-red-500/20 bg-red-500/[0.07] text-red-400"
                 >
                   {kw}
@@ -607,14 +607,24 @@ export default function AnalyzePage() {
                   <div className="text-left">
                     <span className="font-mono text-[10px] uppercase tracking-wider text-red-400 font-semibold border-b border-red-500/10 pb-2 mb-3.5 flex items-center gap-1">
                       <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                      <span>{atsMatchDetail ? "Missing from JD" : "Structural Gaps"}</span>
+                      <span>Missing from Job Description</span>
                     </span>
                     <div className="flex flex-wrap gap-2 mt-3.5">
-                      {resumeData.gaps.map(gap => (
-                        <span key={gap.name} className="px-2.5 py-1 text-[10px] font-mono border border-red-500/20 bg-red-500/5 text-red-400 uppercase tracking-wider rounded">
-                          {gap.name}
+                      {atsMatchDetail && atsMatchDetail.missing_skills.length > 0 ? (
+                        atsMatchDetail.missing_skills.map(skill => (
+                          <span key={skill} className="px-2.5 py-1 text-[10px] font-mono border border-red-500/20 bg-red-500/5 text-red-400 uppercase tracking-wider rounded">
+                            {skill}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-on-surface-variant italic font-mono">
+                          {atsMatchDetail
+                            ? "No gaps detected — all JD skills found in resume."
+                            : jobInput.trim()
+                              ? "Click \u2018Run ATS Check\u2019 to detect missing JD skills."
+                              : "Enter a job description above and click Analyze to detect missing skills."}
                         </span>
-                      ))}
+                      )}
                     </div>
                   </div>
                 </div>

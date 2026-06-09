@@ -93,7 +93,7 @@ async def start_interview(
             model="gemini-2.0-flash",
             contents=system_prompt,
         )
-        initial_question = response.text.strip()
+        initial_question = (response.text or "").strip()
     except Exception as e:
         logger.error(f"Gemini API failure during /start: {e}")
         initial_question = "Welcome. Can you describe your most complex technical project and the architecture behind it?"
@@ -171,7 +171,7 @@ async def respond_interview(
                 model="gemini-2.0-flash",
                 contents=eval_prompt,
             )
-            reply = response.text.strip()
+            reply = (response.text or "").strip()
         except Exception as e:
             logger.error(f"Gemini evaluation failure: {e}")
             reply = "# Evaluation Failed\nCould not reach the AI subsystem to compile the rubric."
@@ -195,7 +195,7 @@ async def respond_interview(
                 model="gemini-2.0-flash",
                 contents=followup_prompt,
             )
-            reply = response.text.strip()
+            reply = (response.text or "").strip()
         except Exception as e:
             logger.error(f"Gemini followup failure: {e}")
             reply = "Could you elaborate further on the architectural constraints of your approach?"
@@ -257,6 +257,8 @@ async def generate_learning_path(payload: GenerateLearningPathRequest):
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
+        if not response.text:
+            raise ValueError("Empty response from Gemini API")
         milestones_raw = extract_json(response.text)
 
         milestones = []
@@ -324,6 +326,8 @@ async def assess_interview(payload: InterviewAssessRequest):
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
+        if not response.text:
+            raise ValueError("Empty response from Gemini API")
         rubric = extract_json(response.text)
 
         result = InterviewAssessResponse(

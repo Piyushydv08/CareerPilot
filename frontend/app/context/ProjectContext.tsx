@@ -36,6 +36,8 @@ export interface ATSMatchDetail {
   missing_keywords: string[];
   suggestions: string[];
   is_ai_powered: boolean;
+  missing_skills: string[];   // jd_skills − resume_skills (canonical, normalized)
+  matched_skills: string[];   // jd_skills ∩ resume_skills
 }
 
 export interface ChatMessage {
@@ -166,46 +168,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  // Analyze Job Description — Gemini-powered ATS analysis
+  // Analyze Job Description — Llama-powered dual extraction (resume skills + JD skills → gap_skills)
   const triggerAnalyze = async (jobDesc: string): Promise<number> => {
     setIsAnalyzing(true);
     setJobDescription(jobDesc);
     addTerminalLog("INFO", `Running ATS compatibility analysis against job description...`);
 
     try {
-      let response;
-      // Prefer new streamlit/match endpoint when file is available
-      if (uploadedFile) {
-        const form = new FormData();
-        form.append("file", uploadedFile);
-        form.append("job_description", jobDesc);
-        response = await fetch(`${BASE_URL}/resume/streamlit/match`, {
-          method: "POST",
-          body: form
-        });
-      } else {
-        response = await fetch(`${BASE_URL}/match/analyze`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            resume: resumeData,
-            job_description: jobDesc,
-            resume_raw_text: resumeData?.raw_text || null
-          })
-        });
-      }
+      // Always call /match/analyze — it now returns resume_skills, jd_skills, gap_skills
+      const response = await fetch(`${BASE_URL}/match/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          resume: resumeData,
+          job_description: jobDesc,
+          resume_raw_text: resumeData?.raw_text || null
+        })
+      });
 
       if (response.ok) {
         const data = await response.json();
-        // If it's the streamlit/match shape
-        if (data.match_percentage !== undefined) {
-          setMatchScore(data.match_percentage);
-          setAtsMatchDetail(prev => prev ? { ...prev, match_score: data.match_percentage } : null);
-          addTerminalLog("INFO", `ATS analysis complete (streamlit). Match score: ${data.match_percentage}%.`);
-          setIsAnalyzing(false);
-          return data.match_percentage;
-        }
-        // Otherwise assume legacy shape
+
         setMatchScore(data.match_score);
         setAtsMatchDetail({
           match_score: data.match_score,
@@ -213,8 +196,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           matched_keywords: data.matched_keywords || [],
           missing_keywords: data.missing_keywords || [],
           suggestions: data.suggestions || [],
-          is_ai_powered: data.is_ai_powered || false
+          is_ai_powered: data.is_ai_powered || false,
+          missing_skills: data.missing_skills || data.gap_skills || [],
+          matched_skills: data.matched_skills || [],
         });
+
+        // Populate resumeData.gaps from missing_skills (true JD-vs-resume gap, never resume-parser gaps)
+        const gapSource: string[] = data.missing_skills || data.gap_skills || [];
+        if (gapSource.length > 0 && resumeData) {
+          const newGaps: SkillGap[] = gapSource.slice(0, 8).map((skill: string) => ({
+            name: skill,
+            category: "Missing from JD",
+            impact: Math.floor(Math.random() * 6) + 8, // 8–13
+            checked: false
+          }));
+          setResumeData(prev => prev ? { ...prev, gaps: newGaps } : prev);
+          addTerminalLog("INFO", `Gap analysis complete: ${newGaps.length} JD skills missing from resume.`);
+        } else if (gapSource.length === 0 && resumeData) {
+          // Clear stale resume-parser gaps when analysis finds no JD gaps
+          setResumeData(prev => prev ? { ...prev, gaps: [] } : prev);
+        }
+
         addTerminalLog("INFO", `ATS analysis complete. Match score: ${data.match_score}%.`);
         setIsAnalyzing(false);
         return data.match_score;
