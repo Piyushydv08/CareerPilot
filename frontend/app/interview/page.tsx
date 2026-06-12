@@ -14,16 +14,15 @@ import {
   Download,
   Share2,
   Info,
-  List,
   AlertTriangle,
   ClipboardList,
-  Play,
   RotateCcw,
   Sparkles,
   Radar,
-  Loader
+  Loader,
+  Upload,
+  FileText
 } from "lucide-react";
-import { useProject, ChatMessage } from "../context/ProjectContext";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
@@ -36,29 +35,29 @@ interface AssessmentData {
   verdict: string;
 }
 
-export default function InterviewPage() {
-  const { 
-    messages, 
-    sendInterviewMessage, 
-    resetInterview,
-    matchScore,
-    resumeData,
-    jobDescription,
-    startInterviewSession,
-    sessionId
-  } = useProject();
+interface ChatMessage {
+  sender: "SYSTEM" | "USER";
+  text: string;
+  timestamp: string;
+}
 
+export default function InterviewPage() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isEnded, setIsEnded] = useState(false);
   const [inputText, setInputText] = useState("");
   const [isThinking, setIsThinking] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(863); // Starts at 14:23
+  const [timerSeconds, setTimerSeconds] = useState(0);
   const [countUpMatch, setCountUpMatch] = useState(0);
   const [isAssessing, setIsAssessing] = useState(false);
   const [assessmentData, setAssessmentData] = useState<AssessmentData | null>(null);
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [interviewPhase, setInterviewPhase] = useState<string>("introduction");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-scroll chat window
   useEffect(() => {
@@ -74,20 +73,185 @@ export default function InterviewPage() {
     return () => clearInterval(timer);
   }, [isEnded]);
 
-  // Start interview session on mount if not already started
+  // Start interview session on mount
   useEffect(() => {
-    if (!sessionStarted && resumeData) {
+    if (!sessionStarted) {
       setSessionStarted(true);
-      startInterviewSession(jobDescription).catch(console.error);
+      startInterviewSession();
     }
-  }, [resumeData]);
+  }, []);
+
+  // Detect interview phase based on message count
+  useEffect(() => {
+    const userMessages = messages.filter(m => m.sender === "USER");
+    if (userMessages.length === 0) {
+      setInterviewPhase("introduction");
+    } else if (userMessages.length <= 2) {
+      setInterviewPhase("job_role");
+    } else if (userMessages.length <= 4) {
+      setInterviewPhase("resume");
+    } else {
+      setInterviewPhase("technical");
+    }
+  }, [messages]);
+
+  const startInterviewSession = async () => {
+    try {
+      setIsThinking(true);
+      const response = await fetch(`${BASE_URL}/interview/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSessionId(data.session_id);
+
+        // Add AI's first message
+        const aiMessage: ChatMessage = {
+          sender: "SYSTEM",
+          text: data.initial_question,
+          timestamp: new Date().toISOString()
+        };
+        setMessages([aiMessage]);
+      }
+    } catch (error) {
+      console.error("Failed to start interview:", error);
+    } finally {
+      setIsThinking(false);
+    }
+  };
 
   // Format Elapsed Time
   const formatTimer = () => {
     const mins = Math.floor(timerSeconds / 60);
     const secs = timerSeconds % 60;
-    const ms = Math.floor(Math.random() * 99);
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Handle resume file upload
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !sessionId) return;
+
+    setUploadedFileName(file.name);
+    
+    // Add user message about upload
+    const userMsg: ChatMessage = {
+      sender: "USER",
+      text: `[Resume uploaded: ${file.name}]`,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, userMsg]);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("session_id", sessionId);
+
+    try {
+      const response = await fetch(`${BASE_URL}/interview/upload_resume`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Add AI acknowledgment
+        setIsThinking(true);
+        const aiMsg: ChatMessage = {
+          sender: "SYSTEM",
+          text: `I've received your resume (${file.name}). Let me review it and continue with our interview. Based on what I can see, let me ask you some relevant questions...`,
+          timestamp: new Date().toISOString()
+        };
+        
+        setTimeout(() => {
+          setMessages(prev => [...prev, aiMsg]);
+          setIsThinking(false);
+          
+          // Trigger AI to ask next question based on resume
+          sendMessageToAI(`[Resume uploaded: ${file.name}]\n\n${data.extracted_text || 'Resume content received'}`, true);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error("Upload failed:", error);
+    }
+  };
+
+  // Handle resume paste
+  const handleResumePaste = () => {
+    setInputText("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.placeholder = "Paste your resume text here...";
+      textareaRef.current.focus();
+    }
+  };
+
+  // Send message to AI
+  const sendMessageToAI = async (text: string, skipUserMessage: boolean = false) => {
+    if (!sessionId) return;
+
+    try {
+      setIsThinking(true);
+
+      const response = await fetch(`${BASE_URL}/interview/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          response: text,
+          chat_history: messages,
+          is_complete: false
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        const aiMsg: ChatMessage = {
+          sender: "SYSTEM",
+          text: data.reply,
+          timestamp: new Date().toISOString()
+        };
+        
+        setMessages(prev => [...prev, aiMsg]);
+      }
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
+  // Handle sending a message
+  const handleSendMessage = async () => {
+    if (!inputText.trim()) return;
+    
+    const text = inputText;
+    setInputText("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.placeholder = "Type your response...";
+    }
+
+    // Add user message
+    const userMsg: ChatMessage = {
+      sender: "USER",
+      text: text,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, userMsg]);
+
+    // Send to AI
+    await sendMessageToAI(text);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
   };
 
   // Trigger End of Session — calls /interview/assess for real rubric
@@ -126,8 +290,7 @@ export default function InterviewPage() {
       }
     } catch (e) {
       console.error("Assessment failed, using fallback score", e);
-      // Fallback with context matchScore
-      const target = matchScore || 75;
+      const target = 75;
       setCountUpMatch(0);
       setTimeout(() => {
         const stepTime = Math.max(10, Math.floor(1500 / target));
@@ -156,104 +319,160 @@ export default function InterviewPage() {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!inputText.trim()) return;
-    const text = inputText;
-    setInputText("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
-
-    setIsThinking(true);
-    await sendInterviewMessage(text);
-    setIsThinking(false);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
   const handleRestart = () => {
-    resetInterview();
+    setMessages([]);
     setIsEnded(false);
-    setTimerSeconds(863);
+    setTimerSeconds(0);
     setAssessmentData(null);
     setCountUpMatch(0);
     setSessionStarted(false);
+    setSessionId(null);
+    setUploadedFileName(null);
+    setInterviewPhase("introduction");
+  };
+
+  // Get phase indicator
+  const getPhaseLabel = () => {
+    switch (interviewPhase) {
+      case "introduction": return "Introduction";
+      case "job_role": return "Role Discussion";
+      case "resume": return "Resume Review";
+      case "technical": return "Technical Interview";
+      default: return "Interview";
+    }
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden animate-fade-in relative bg-[#030305] text-left">
+    <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden animate-fade-in relative bg-bg-deep text-left">
       {!isEnded ? (
         /* 1. Live Chat Interview Workspace */
         <div className="flex flex-1 flex-col lg:flex-row overflow-hidden w-full h-full">
           {/* Left Performance Telemetry Panel (320px width) */}
           <aside className="w-full lg:w-80 border-b lg:border-b-0 lg:border-r border-outline-variant bg-surface-container-low shrink-0 overflow-y-auto flex flex-col p-6 space-y-8 z-20">
+            {/* Interview Phase Indicator */}
+            <div className="space-y-2 text-left">
+              <h3 className="font-mono text-[9px] text-on-surface-variant tracking-wider uppercase font-semibold">Current Phase</h3>
+              <div className="px-3 py-2 bg-cyber-blue/10 border border-cyber-blue/20 rounded text-cyber-blue font-mono text-sm font-bold">
+                {getPhaseLabel()}
+              </div>
+            </div>
+
             {/* Timer */}
             <div className="space-y-1.5 text-left">
               <h3 className="font-mono text-[9px] text-on-surface-variant tracking-wider uppercase font-semibold">T-Elapsed</h3>
-              <div className="font-mono text-3.5xl text-cyber-blue font-light glow-text leading-none">
+              <div className="font-mono text-3xl text-cyber-blue font-light glow-text leading-none">
                 {formatTimer()}
               </div>
+            </div>
+
+            {/* Resume Upload Status */}
+            <div className="space-y-3 text-left">
+              <h3 className="font-mono text-[9px] text-on-surface-variant tracking-wider uppercase font-semibold">Resume</h3>
+              {uploadedFileName ? (
+                <div className="flex items-center gap-2 p-3 bg-green-950/20 border border-green-500/20 rounded">
+                  <FileText className="h-4 w-4 text-green-400" />
+                  <span className="text-xs text-green-400 font-mono truncate">{uploadedFileName}</span>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 px-3 py-2 bg-surface-dim hover:bg-surface-container border border-outline-variant rounded text-xs font-mono text-on-surface hover:text-cyber-blue transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Upload
+                  </button>
+                  <button
+                    onClick={handleResumePaste}
+                    className="flex-1 px-3 py-2 bg-surface-dim hover:bg-surface-container border border-outline-variant rounded text-xs font-mono text-on-surface hover:text-cyber-blue transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Paste
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleResumeUpload}
+                    className="hidden"
+                    accept=".txt,.pdf,.docx"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Metrics Bento Grid */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-surface-dim border border-outline-variant p-4 flex flex-col gap-2 rounded hover:border-cyber-blue/30 transition-colors">
-                <Activity className="h-4.5 w-4.5 text-on-surface-variant" />
-                <span className="font-mono text-2xl font-bold text-white">86%</span>
-                <span className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider font-semibold">Pacing Score</span>
+                <Activity className="h-4 w-4 text-on-surface-variant" />
+                <span className="font-mono text-2xl font-bold text-white">
+                  {messages.filter(m => m.sender === "USER").length}
+                </span>
+                <span className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider font-semibold">Responses</span>
               </div>
               <div className="bg-surface-dim border border-outline-variant p-4 flex flex-col gap-2 rounded hover:border-cyber-blue/30 transition-colors">
-                <Bot className="h-4.5 w-4.5 text-on-surface-variant" />
-                <span className="font-mono text-2xl font-bold text-white">A-</span>
-                <span className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider font-semibold">Clarity Rating</span>
+                <Bot className="h-4 w-4 text-on-surface-variant" />
+                <span className="font-mono text-2xl font-bold text-white">
+                  {messages.filter(m => m.sender === "SYSTEM").length}
+                </span>
+                <span className="font-mono text-[9px] text-on-surface-variant uppercase tracking-wider font-semibold">Questions</span>
               </div>
             </div>
 
-            {/* Confidence Metric Progress Bar */}
+            {/* Interview Progress */}
             <div className="space-y-3.5 text-left">
               <div className="flex justify-between items-baseline font-mono text-[9px] uppercase tracking-wider font-semibold">
-                <span className="text-on-surface-variant">Confidence Metric</span>
-                <span className="text-cyber-blue glow-text">Stable</span>
+                <span className="text-on-surface-variant">Progress</span>
+                <span className="text-cyber-blue glow-text">{getPhaseLabel()}</span>
               </div>
               <div className="h-2 bg-surface-dim w-full rounded overflow-hidden border border-outline-variant/60 relative">
                 <div 
                   className="h-full bg-cyber-blue/80 shadow-[0_0_8px_rgba(0,210,255,0.6)] rounded-full transition-all duration-500"
-                  style={{ width: "78%" }}
+                  style={{ 
+                    width: interviewPhase === "introduction" ? "15%" : 
+                           interviewPhase === "job_role" ? "35%" : 
+                           interviewPhase === "resume" ? "55%" : "80%" 
+                  }}
                 >
                   <div className="absolute right-0 top-0 bottom-0 w-1 bg-white"></div>
                 </div>
               </div>
               <div className="flex justify-between font-mono text-[9px] text-on-surface-variant/40">
-                <span>Low</span>
-                <span>High</span>
+                <span>Start</span>
+                <span>Assessment</span>
               </div>
             </div>
 
             {/* Extracted technical terms */}
-            <div className="flex-grow flex flex-col min-h-0 text-left">
+            <div className="grow flex flex-col min-h-0 text-left">
               <h3 className="font-mono text-[9px] text-on-surface-variant tracking-wider uppercase font-semibold mb-4 shrink-0">
                 Tech Terms Extracted
               </h3>
-              <div className="flex-grow overflow-y-auto space-y-2 pr-1 text-xs font-mono">
-                <div className="flex items-center justify-between py-1 border-b border-outline-variant/20 hover:border-cyber-blue/40 transition-colors group">
-                  <span className="text-white">Microservices</span>
-                  <Check className="h-3.5 w-3.5 text-cyber-blue opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-outline-variant/20 hover:border-cyber-blue/40 transition-colors group">
-                  <span className="text-white">Event-Driven Arch</span>
-                  <Check className="h-3.5 w-3.5 text-cyber-blue opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-outline-variant/20 hover:border-cyber-blue/40 transition-colors group">
-                  <span className="text-white">Kubernetes</span>
-                  <Check className="h-3.5 w-3.5 text-cyber-blue opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-outline-variant/20 hover:border-cyber-blue/40 transition-colors text-on-surface-variant/60 italic group">
-                  <span>CAP Theorem</span>
-                  <Hourglass className="h-3.5 w-3.5 text-on-surface-variant/40 animate-spin" />
-                </div>
+              <div className="grow overflow-y-auto space-y-2 pr-1 text-xs font-mono">
+                {messages.length > 2 ? (
+                  <>
+                    <div className="flex items-center justify-between py-1 border-b border-outline-variant/20 hover:border-cyber-blue/40 transition-colors group">
+                      <span className="text-white">
+                        {interviewPhase === "introduction" ? "Background" : 
+                         interviewPhase === "job_role" ? "Role Focus" : "Technical Skills"}
+                      </span>
+                      <Check className="h-3.5 w-3.5 text-cyber-blue opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="flex items-center justify-between py-1 border-b border-outline-variant/20 hover:border-cyber-blue/40 transition-colors group">
+                      <span className="text-white">
+                        {interviewPhase === "technical" ? "In Progress..." : "Pending"}
+                      </span>
+                      {interviewPhase === "technical" ? (
+                        <Hourglass className="h-3.5 w-3.5 text-on-surface-variant/40 animate-spin" />
+                      ) : (
+                        <Check className="h-3.5 w-3.5 text-cyber-blue opacity-0 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-on-surface-variant/40 italic text-xs">
+                    Waiting for conversation to start...
+                  </div>
+                )}
               </div>
             </div>
 
@@ -261,15 +480,20 @@ export default function InterviewPage() {
             <div className="shrink-0 pt-4 border-t border-outline-variant/60">
               <button 
                 onClick={handleEndSession}
-                disabled={isAssessing}
-                className="w-full bg-red-950/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-black hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] transition-all duration-300 py-3 rounded font-mono text-[10px] uppercase tracking-wider font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                disabled={isAssessing || messages.length < 4}
+                className="w-full bg-red-950/20 text-red-400 border border-red-500/30 hover:bg-red-500 hover:text-black hover:border-red-500 hover:shadow-[0_0_10px_rgba(239,68,68,0.4)] transition-all duration-300 py-3 rounded font-mono text-[10px] uppercase tracking-wider font-bold flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isAssessing ? (
-                  <><Loader className="h-4.5 w-4.5 animate-spin" /><span>Assessing...</span></>
+                  <><Loader className="h-4 w-4 animate-spin" /><span>Assessing...</span></>
                 ) : (
-                  <><StopCircle className="h-4.5 w-4.5" /><span>End &amp; Get Rubric</span></>
+                  <><StopCircle className="h-4 w-4" /><span>End &amp; Get Rubric</span></>
                 )}
               </button>
+              {messages.length < 4 && (
+                <p className="text-[8px] text-on-surface-variant/40 mt-1 text-center">
+                  Complete at least the introduction and job role phases
+                </p>
+              )}
             </div>
           </aside>
 
@@ -277,6 +501,15 @@ export default function InterviewPage() {
           <section className="flex-1 flex flex-col bg-bg-deep relative overflow-hidden h-full z-10">
             {/* Scrollable feed messages */}
             <div className="flex-1 overflow-y-auto p-8 space-y-6 scroll-smooth pb-36 h-full">
+              {messages.length === 0 && !isThinking && (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-4">
+                    <Bot className="h-16 w-16 text-cyber-blue/30 mx-auto animate-pulse" />
+                    <p className="text-on-surface-variant font-mono text-sm">Initializing interview session...</p>
+                  </div>
+                </div>
+              )}
+
               {messages.map((msg, index) => {
                 const isSystem = msg.sender === "SYSTEM";
                 return (
@@ -296,11 +529,11 @@ export default function InterviewPage() {
                       <div className="font-mono text-[9px] text-on-surface-variant">
                         {isSystem ? (
                           <>
-                            [SYSTEM.AI] <span className="text-on-surface-variant/40">{msg.timestamp}</span>
+                            [INTERVIEWER] <span className="text-on-surface-variant/40">{new Date(msg.timestamp).toLocaleTimeString()}</span>
                           </>
                         ) : (
                           <>
-                            <span className="text-on-surface-variant/40">{msg.timestamp}</span> [USER]
+                            <span className="text-on-surface-variant/40">{new Date(msg.timestamp).toLocaleTimeString()}</span> [YOU]
                           </>
                         )}
                       </div>
@@ -330,7 +563,7 @@ export default function InterviewPage() {
                     <Bot className="h-4 w-4 text-cyber-blue animate-pulse" />
                   </div>
                   <div className="space-y-1.5 flex flex-col">
-                    <div className="font-mono text-[9px] text-on-surface-variant">[SYSTEM.AI] <span className="text-cyber-blue">Processing...</span></div>
+                    <div className="font-mono text-[9px] text-on-surface-variant">[INTERVIEWER] <span className="text-cyber-blue">Thinking...</span></div>
                     <div className="bg-surface-container border border-outline-variant rounded-lg rounded-tl-none p-4 flex items-center gap-1.5 shrink-0">
                       <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-ping" style={{ animationDelay: "0.2s" }}></span>
                       <span className="w-1.5 h-1.5 bg-cyber-blue rounded-full animate-ping" style={{ animationDelay: "0.4s" }}></span>
@@ -344,34 +577,48 @@ export default function InterviewPage() {
             </div>
 
             {/* Input Bar Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-bg-deep via-bg-deep/90 to-transparent pt-12 z-20">
+            <div className="absolute bottom-0 left-0 right-0 p-6 bg-linear-to-t from-bg-deep via-bg-deep/90 to-transparent pt-12 z-20">
               <div className="max-w-4xl mx-auto">
                 <div className="bg-surface-container-low border border-outline-variant rounded-lg focus-within:border-cyber-blue focus-within:ring-1 focus-within:ring-cyber-blue transition-all duration-200 p-2 shadow-lg flex gap-2">
                   <div className="pt-2 pl-2 text-cyber-blue font-mono select-none shrink-0 font-bold">&gt;</div>
                   <textarea 
                     ref={textareaRef}
                     className="w-full bg-transparent border-none text-white font-sans text-xs focus:ring-0 resize-none h-14 py-2 placeholder-on-surface-variant/40 focus:outline-none"
-                    placeholder="Speak or type your response..."
+                    placeholder="Type your response..."
                     value={inputText}
                     onChange={handleInputChange}
                     onKeyDown={handleKeyDown}
                     disabled={isThinking}
                   />
                   <div className="flex flex-col justify-end gap-2 pb-1 pr-1 shrink-0">
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-9 h-9 rounded bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant hover:text-cyber-blue transition-colors flex items-center justify-center border border-outline-variant cursor-pointer"
+                      title="Upload Resume"
+                    >
+                      <Upload className="h-4 w-4" />
+                    </button>
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleResumeUpload}
+                      className="hidden"
+                      accept=".txt,.pdf,.docx"
+                    />
                     <button className="w-9 h-9 rounded bg-surface-container-high hover:bg-surface-container-highest text-on-surface-variant hover:text-cyber-blue transition-colors flex items-center justify-center border border-outline-variant cursor-pointer">
                       <Mic className="h-4 w-4" />
                     </button>
                     <button 
                       onClick={handleSendMessage}
-                      disabled={isThinking}
-                      className="w-9 h-9 rounded bg-cyber-blue text-black hover:bg-white transition-colors flex items-center justify-center font-bold cursor-pointer disabled:opacity-50"
+                      disabled={isThinking || !inputText.trim()}
+                      className="w-9 h-9 rounded bg-cyber-blue text-black hover:bg-white transition-colors flex items-center justify-center font-bold cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <Send className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
                 <div className="flex justify-between items-center mt-2.5 px-2 font-mono text-[9px] text-on-surface-variant/50">
-                  <span>Press Enter to send, Shift+Enter for new line.</span>
+                  <span>Press Enter to send • Shift+Enter for new line</span>
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-cyber-blue animate-pulse"></span>
                     <span>CONNECTION SECURE</span>
@@ -391,10 +638,10 @@ export default function InterviewPage() {
                 <span className="px-2 py-0.5 bg-surface-container-highest border border-outline-variant rounded-sm text-[9px] text-cyber-blue tracking-wider uppercase font-bold shadow-[0_0_6px_rgba(0,210,255,0.2)] animate-pulse">
                   SESSION ENDED
                 </span>
-                <span className="text-[10px] text-on-surface-variant">ID: INT-8924-X</span>
+                <span className="text-[10px] text-on-surface-variant">ID: {sessionId?.slice(0, 8) || 'N/A'}</span>
               </div>
               <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-2">
-                Senior Frontend Engineer Assessment Report <Sparkles className="h-5.5 w-5.5 text-cyber-blue" />
+                Interview Assessment Report <Sparkles className="h-5 w-5 text-cyber-blue" />
               </h2>
               <p className="text-xs text-on-surface-variant font-mono mt-1">
                 {assessmentData ? assessmentData.verdict : "AI assessment report generated."}
@@ -405,7 +652,7 @@ export default function InterviewPage() {
                 onClick={handleRestart}
                 className="px-4 py-2 bg-surface-container-low border border-outline-variant rounded text-xs font-mono font-bold text-on-surface hover:bg-surface-container hover:text-cyber-blue hover:border-cyber-blue/30 transition-all flex items-center gap-2 cursor-pointer"
               >
-                <RotateCcw className="h-4 w-4" /> Restart Session
+                <RotateCcw className="h-4 w-4" /> New Interview
               </button>
               <button className="px-4 py-2 bg-surface-container-low border border-outline-variant rounded text-xs font-mono font-bold text-on-surface hover:bg-surface-container transition-all flex items-center gap-2 cursor-pointer">
                 <Download className="h-4 w-4" /> Export PDF
@@ -437,7 +684,7 @@ export default function InterviewPage() {
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
-                {assessmentData ? `Technical: ${assessmentData.technical_score}%` : "Exceeds benchmark baseline criteria by 14%."}
+                {assessmentData ? `Technical: ${assessmentData.technical_score}%` : "Assessment complete."}
               </p>
             </div>
 
@@ -460,7 +707,7 @@ export default function InterviewPage() {
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
-                Articulate, structured framework context.
+                Articulate, structured responses.
               </p>
             </div>
 
@@ -483,7 +730,7 @@ export default function InterviewPage() {
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
-                Strong engineering core, superficial edges.
+                Strong engineering core demonstrated.
               </p>
             </div>
           </div>
@@ -494,11 +741,11 @@ export default function InterviewPage() {
             <div className="lg:col-span-2 bg-surface-container border border-outline-variant rounded-lg p-8">
               <div className="flex items-center justify-between mb-6 border-b border-outline-variant/60 pb-4">
                 <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-widest flex items-center gap-1.5">
-                  <Info className="h-4.5 w-4.5" />
+                  <Info className="h-4 w-4" />
                   <span>AI Synthesis Summary</span>
                 </h3>
                 <span className="text-[9px] font-mono text-on-surface-variant bg-surface-dim border border-outline-variant px-2 py-0.5 rounded-sm terminal-cursor uppercase">
-                  Model: cp-v4-turbo
+                  Model: Groq LLM
                 </span>
               </div>
 
@@ -507,7 +754,7 @@ export default function InterviewPage() {
                   <h4 className="font-sans text-base font-bold text-white mb-2">Executive Summary</h4>
                   <p className="text-on-surface-variant leading-relaxed">
                     {assessmentData?.strengths.join(" ") || 
-                      "The candidate demonstrated a robust understanding of modern React paradigms and component architecture. They successfully navigated the architectural design questions, showing a preference for composition over inheritance and highlighting the importance of memoization in large-scale applications."}
+                      "The candidate demonstrated relevant technical knowledge and communication skills throughout the interview. They successfully navigated the technical questions and showed the ability to articulate complex concepts clearly."}
                   </p>
                 </div>
 
@@ -515,13 +762,13 @@ export default function InterviewPage() {
                   <h4 className="font-sans text-base font-bold text-white mb-2">AI Assessment Verdict</h4>
                   <p className="text-on-surface-variant leading-relaxed">
                     {assessmentData?.verdict || 
-                      "Candidate shows strong foundational knowledge. Recommend proceeding to the next round with a focus on system design depth."}
+                      "Candidate shows foundational knowledge. Consider for the position based on team fit and specific requirements."}
                   </p>
                 </div>
 
                 {assessmentData?.strengths && assessmentData.strengths.length > 0 && (
                   <div className="animate-fade-slide-up" style={{ animationDelay: "300ms" }}>
-                    <h4 className="font-sans text-base font-bold text-white mb-2">Behavioral Indicators</h4>
+                    <h4 className="font-sans text-base font-bold text-white mb-2">Key Strengths</h4>
                     <ul className="list-disc list-inside space-y-2 text-on-surface-variant leading-relaxed">
                       {assessmentData.strengths.map((s, i) => (
                         <li key={i}>{s}</li>
@@ -537,28 +784,28 @@ export default function InterviewPage() {
               <div className="bg-surface-container border border-outline-variant rounded-lg flex flex-col h-full overflow-hidden">
                 <div className="p-5 border-b border-outline-variant bg-[#0c0c10]/40 text-left">
                   <h3 className="font-mono text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-1.5 leading-none">
-                    <AlertTriangle className="h-4.5 w-4.5 text-red-500 animate-pulse" />
-                    <span>Critical Weaknesses</span>
+                    <AlertTriangle className="h-4 w-4 text-red-500 animate-pulse" />
+                    <span>Areas for Improvement</span>
                   </h3>
                 </div>
 
                 <div className="p-5 flex-1 flex flex-col gap-5 text-left">
                   {(assessmentData?.weaknesses && assessmentData.weaknesses.length > 0 
                     ? assessmentData.weaknesses 
-                    : ["Performance Anti-Patterns", "CSS Architecture"]
+                    : ["Could provide more specific examples", "Expand on system design concepts"]
                   ).map((weakness, idx) => (
                     <div key={idx} className={`border border-outline-variant/60 rounded p-4 bg-[#050508]/40 relative group ${idx % 2 === 0 ? "hover:border-red-500/20" : "hover:border-cyber-blue/20"} transition-all duration-300`}>
-                      <div className={`absolute -left-[1px] top-4 bottom-4 w-[2px] ${idx % 2 === 0 ? "bg-red-500 group-hover:shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-cyber-blue group-hover:shadow-[0_0_8px_rgba(0,210,255,0.8)]"}`}></div>
+                      <div className={`absolute -left-px top-4 bottom-4 w-0.5 ${idx % 2 === 0 ? "bg-red-500 group-hover:shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-cyber-blue group-hover:shadow-[0_0_8px_rgba(0,210,255,0.8)]"}`}></div>
                       <h4 className="text-xs font-mono uppercase text-white font-bold mb-1">
-                        {assessmentData ? `Gap ${idx + 1}` : (idx === 0 ? "Performance Anti-Patterns" : "CSS Architecture")}
+                        {assessmentData ? `Area ${idx + 1}` : "Focus Area"}
                       </h4>
                       <p className="text-[11px] text-on-surface-variant leading-relaxed mb-3">
                         {weakness}
                       </p>
                       <div className="bg-surface-dim p-3 rounded border border-outline-variant/60">
-                        <span className="text-[9px] font-mono text-cyber-blue font-bold block mb-1 uppercase tracking-wider">Action Item</span>
+                        <span className="text-[9px] font-mono text-cyber-blue font-bold block mb-1 uppercase tracking-wider">Recommendation</span>
                         <span className="text-xs text-on-surface-variant font-sans leading-normal block">
-                          Focus on this area in follow-up technical rounds. Prepare targeted questions to probe understanding.
+                          Focus on this area for continued professional development and future interviews.
                         </span>
                       </div>
                     </div>

@@ -525,11 +525,14 @@ async def streamlit_match(
         jd_terms = set(re.findall(r"\w+", job_description.lower()))
         # Extract skills from mock or parsed result
         skills: list[str] = []
-        if isinstance(result, dict) and isinstance(result.get("mock"), dict):
+
+        mock_data = result.get("mock") if isinstance(result, dict) else None
+
+        if isinstance(mock_data, dict):
             skills = [
                 str(s.get("name", ""))
-                for s in result["mock"].get("skills", [])
-                if isinstance(s, dict) and "name" in s
+                for s in mock_data.get("skills", [])
+                if isinstance(s, dict)
             ]
         else:
             skills = re.findall(r"\w+", text.lower())[:50]
