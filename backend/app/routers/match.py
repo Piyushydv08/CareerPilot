@@ -124,7 +124,6 @@ def deduplicate_skills(skills: list[str]) -> list[str]:
     return result
 
 
-
 def extract_json(text: str) -> dict:
     """Robustly extract JSON from a model response (handles markdown fences)."""
     text = text.strip()
@@ -367,6 +366,18 @@ def fallback_detailed_analysis(resume_text: str, job_description: str, resume_da
     }
 
 # ----------------------------------------------------------------------
+# Helper: build a default ATSCategoryScores from an ats_analysis dict
+# ----------------------------------------------------------------------
+def _build_category_scores(ats: dict) -> ATSCategoryScores:
+    return ATSCategoryScores(
+        skills_match=int(ats.get("skills_score", 50)),
+        experience_relevance=int(ats.get("experience_score", 50)),
+        keyword_density=int(ats.get("keyword_score", 50)),
+        education_certifications=int(max(ats.get("education_score", 50), ats.get("certification_score", 50))),
+        formatting_completeness=int(ats.get("formatting_score", 50)),
+    )
+
+# ----------------------------------------------------------------------
 # Updated endpoint
 # ----------------------------------------------------------------------
 @router.post("/analyze", response_model=MatchAnalysisResponse)
@@ -411,9 +422,33 @@ async def analyze_match_score(
     ats = detailed_result.get("ats_analysis", {})
     resume_data_parsed = detailed_result.get("resume_data", {})
 
+    # ── ATS Score Safety Rule: no JD → resume-only readiness response ─────────
+    if not job_description:
+        readiness_score = int(ats.get("ats_score", 0))
+        readiness_category_scores = _build_category_scores(ats)
+        resume_skills_only = [
+            s for s in resume_data_parsed.get("technical_skills", []) if isinstance(s, str)
+        ]
+        if not resume_skills_only and payload.resume:
+            resume_skills_only = [s.name for s in payload.resume.skills]
+        return MatchAnalysisResponse(
+            match_score=readiness_score,
+            category_scores=readiness_category_scores,
+            matched_keywords=[],
+            missing_keywords=[],
+            suggestions=ats.get("recommendations", [])[:5],
+            missing_terms=[],
+            is_ai_powered=not IS_GEMINI_MOCK,
+            resume_skills=deduplicate_skills(resume_skills_only),
+            jd_skills=[],
+            matched_skills=[],
+            missing_skills=[],
+            gap_skills=[],
+        )
+
     # ── Call B: JD skill extraction via Llama ─────────────────────────────────
     jd_skills: list[str] = []
-    if job_description and not IS_GROQ_MOCK:
+    if not IS_GROQ_MOCK:
         try:
             raw_jd_response = await call_llama(JD_SKILL_EXTRACTION_PROMPT, job_description[:5000])
             parsed_jd = extract_json(raw_jd_response)
@@ -424,19 +459,19 @@ async def analyze_match_score(
                 raw_list = parsed_jd
             else:
                 raw_list = []
-            jd_skills = [normalize_skill(str(s)) for s in raw_list if isinstance(s, str)]
+            jd_skills = [normalize_skill(s) for s in raw_list if isinstance(s, str)]
             logger.info(f"Llama extracted {len(jd_skills)} JD skills.")
         except Exception as e:
             logger.error(f"Llama JD skill extraction failed: {e}")
             jd_skills = [normalize_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])]
-    elif job_description and IS_GROQ_MOCK:
+    else:
         jd_skills = [normalize_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])]
 
     # ── Resume skills: prefer Gemini's technical_skills, fall back to payload skills ──
     raw_resume_skills: list[str] = []
     parsed_tech = resume_data_parsed.get("technical_skills", [])
     if isinstance(parsed_tech, list) and parsed_tech:
-        raw_resume_skills = [str(s) for s in parsed_tech if isinstance(s, str)]
+        raw_resume_skills = [s for s in parsed_tech if isinstance(s, str)]
     elif payload.resume and payload.resume.skills:
         raw_resume_skills = [s.name for s in payload.resume.skills]
     resume_skills = [normalize_skill(s) for s in raw_resume_skills]
@@ -448,17 +483,11 @@ async def analyze_match_score(
     matched_skills = [jd_lower_map[k] for k in jd_lower_map if k in resume_set]
 
     # ── Build legacy response structure (for current frontend) ────────────────
-    match_score = ats.get("ats_score", 0)
+    match_score = int(ats.get("ats_score", 0))
     is_ai_powered = not IS_GEMINI_MOCK
 
     # Map category scores (from new schema to old 5 categories)
-    category_scores = ATSCategoryScores(
-        skills_match=ats.get("skills_score", 50),
-        experience_relevance=ats.get("experience_score", 50),
-        keyword_density=ats.get("keyword_score", 50),
-        education_certifications=max(ats.get("education_score", 50), ats.get("certification_score", 50)),
-        formatting_completeness=ats.get("formatting_score", 50),
-    )
+    category_scores = _build_category_scores(ats)
 
     # Use ONLY the set-difference computed matched_skills/missing_skills for keyword lists.
     # This guarantees the displayed keywords are strictly JD ∩ Resume and JD − Resume,
@@ -486,10 +515,10 @@ async def analyze_match_score(
     missing_keywords = deduplicate_skills(missing_keywords)
 
     # ── Debug logging to verify the ATS calculation pipeline ─────────────────
-    print("RESUME SKILLS:", resume_skills)
-    print("JD SKILLS:", jd_skills)
-    print("MATCHED SKILLS:", matched_skills)
-    print("MISSING SKILLS:", missing_skills)
+    logger.debug("RESUME SKILLS: %s", resume_skills)
+    logger.debug("JD SKILLS: %s", jd_skills)
+    logger.debug("MATCHED SKILLS: %s", matched_skills)
+    logger.debug("MISSING SKILLS: %s", missing_skills)
 
     # ── Persist the detailed result in DB ─────────────────────────────────────
     if db is not None:
@@ -500,7 +529,7 @@ async def analyze_match_score(
                 "detailed_result": detailed_result,
                 "is_ai_powered": is_ai_powered,
                 "jd_skills": jd_skills,
-                "missing_skills": missing_skills,  # fixed: was referencing undefined gap_skills
+                "missing_skills": missing_skills,
             })
         except Exception as e:
             logger.warning(f"Failed to store detailed ATS log: {e}")

@@ -71,7 +71,7 @@ async def generate_outreach_email(payload: OutreachGenerateRequest):
             contents=prompt,
             config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
-        result = extract_json(response.text)
+        result = extract_json(response.text or "")
 
         subject = str(result.get("subject", f"{payload.target_role} Opportunity — {payload.candidate_name}"))
         body = str(result.get("body", ""))

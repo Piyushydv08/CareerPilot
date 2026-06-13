@@ -1,0 +1,33 @@
+{
+  "technical_skills": [
+    "Python",
+    "Pandas",
+    "NumPy",
+    "Scikit-learn",
+    "Matplotlib",
+    "SQL",
+    "Excel",
+    "Data Visualization",
+    "LangChain",
+    "MySQL",
+    "Spacy",
+    "Streamlit",
+    "TMDB API",
+    "NLP",
+    "Generative AI",
+    "LLM APIs",
+    "Resume Parsing"
+  ],
+  "representative_skills": [
+    "Python",
+    "Scikit-learn",
+    "SQL",
+    "MySQL",
+    "Pandas",
+    "NumPy",
+    "Streamlit",
+    "NLP",
+    "Data Visualization",
+    "Excel"
+  ]
+}

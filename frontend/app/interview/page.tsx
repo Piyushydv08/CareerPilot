@@ -30,8 +30,11 @@ interface AssessmentData {
   overall_score: number;
   technical_score: number;
   communication_score: number;
+  resume_strength_score?: number;
+  role_fit_score?: number;
   strengths: string[];
   weaknesses: string[];
+  missing_skills?: string[];
   verdict: string;
 }
 
@@ -81,19 +84,8 @@ export default function InterviewPage() {
     }
   }, []);
 
-  // Detect interview phase based on message count
-  useEffect(() => {
-    const userMessages = messages.filter(m => m.sender === "USER");
-    if (userMessages.length === 0) {
-      setInterviewPhase("introduction");
-    } else if (userMessages.length <= 2) {
-      setInterviewPhase("job_role");
-    } else if (userMessages.length <= 4) {
-      setInterviewPhase("resume");
-    } else {
-      setInterviewPhase("technical");
-    }
-  }, [messages]);
+  // Interview phase is now read from the API response (DB-authoritative)
+  // No longer inferred from client-side message count
 
   const startInterviewSession = async () => {
     try {
@@ -135,8 +127,8 @@ export default function InterviewPage() {
     if (!file || !sessionId) return;
 
     setUploadedFileName(file.name);
-    
-    // Add user message about upload
+
+    // Add user message about upload (visible in chat)
     const userMsg: ChatMessage = {
       sender: "USER",
       text: `[Resume uploaded: ${file.name}]`,
@@ -149,6 +141,7 @@ export default function InterviewPage() {
     formData.append("session_id", sessionId);
 
     try {
+      setIsThinking(true);
       const response = await fetch(`${BASE_URL}/interview/upload_resume`, {
         method: "POST",
         body: formData,
@@ -156,25 +149,37 @@ export default function InterviewPage() {
 
       if (response.ok) {
         const data = await response.json();
-        
-        // Add AI acknowledgment
-        setIsThinking(true);
-        const aiMsg: ChatMessage = {
+
+        // Show acknowledgment
+        const charCount: number = data.char_count ?? 0;
+        const aiAckMsg: ChatMessage = {
           sender: "SYSTEM",
-          text: `I've received your resume (${file.name}). Let me review it and continue with our interview. Based on what I can see, let me ask you some relevant questions...`,
+          text: `I've received your resume (${file.name}${
+            charCount > 0 ? `, ${charCount.toLocaleString()} characters extracted` : ''
+          }). Let me review it and ask you some targeted technical questions based on your experience.`,
           timestamp: new Date().toISOString()
         };
-        
-        setTimeout(() => {
-          setMessages(prev => [...prev, aiMsg]);
-          setIsThinking(false);
-          
-          // Trigger AI to ask next question based on resume
-          sendMessageToAI(`[Resume uploaded: ${file.name}]\n\n${data.extracted_text || 'Resume content received'}`, true);
-        }, 1000);
+        setMessages(prev => [...prev, aiAckMsg]);
+        setInterviewPhase("technical");
+
+        // Trigger the first technical question — include the ack message in history
+        await sendMessageToAI(
+          `[Resume uploaded: ${file.name}]`,
+          [...messages, userMsg, aiAckMsg]
+        );
+      } else {
+        const err = await response.json().catch(() => ({ message: "Upload failed" }));
+        const errMsg: ChatMessage = {
+          sender: "SYSTEM",
+          text: `Sorry, I couldn't parse that file: ${err.message || "unknown error"}. Try saving as .txt and uploading again, or paste your resume text directly.`,
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errMsg]);
       }
     } catch (error) {
       console.error("Upload failed:", error);
+    } finally {
+      setIsThinking(false);
     }
   };
 
@@ -188,9 +193,14 @@ export default function InterviewPage() {
     }
   };
 
-  // Send message to AI
-  const sendMessageToAI = async (text: string, skipUserMessage: boolean = false) => {
+  // Send message to AI — currentMessages allows passing in-flight state
+  const sendMessageToAI = async (
+    text: string,
+    currentMessages?: ChatMessage[]
+  ) => {
     if (!sessionId) return;
+
+    const historyToSend = currentMessages ?? messages;
 
     try {
       setIsThinking(true);
@@ -201,20 +211,24 @@ export default function InterviewPage() {
         body: JSON.stringify({
           session_id: sessionId,
           response: text,
-          chat_history: messages,
+          chat_history: historyToSend,
           is_complete: false
         })
       });
 
       if (response.ok) {
         const data = await response.json();
-        
+
+        // Update phase from DB-authoritative API response
+        if (data.phase) {
+          setInterviewPhase(data.phase);
+        }
+
         const aiMsg: ChatMessage = {
           sender: "SYSTEM",
           text: data.reply,
           timestamp: new Date().toISOString()
         };
-        
         setMessages(prev => [...prev, aiMsg]);
       }
     } catch (error) {
@@ -227,7 +241,7 @@ export default function InterviewPage() {
   // Handle sending a message
   const handleSendMessage = async () => {
     if (!inputText.trim()) return;
-    
+
     const text = inputText;
     setInputText("");
     if (textareaRef.current) {
@@ -235,16 +249,17 @@ export default function InterviewPage() {
       textareaRef.current.placeholder = "Type your response...";
     }
 
-    // Add user message
+    // Add user message to local state first
     const userMsg: ChatMessage = {
       sender: "USER",
       text: text,
       timestamp: new Date().toISOString()
     };
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
 
-    // Send to AI
-    await sendMessageToAI(text);
+    // Send to AI with the updated history (including this new message)
+    await sendMessageToAI(text, updatedMessages);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -665,7 +680,7 @@ export default function InterviewPage() {
 
           {/* Dynamic Metrics Bento Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {/* Match score bar count up */}
+            {/* Overall Match score count-up */}
             <div className="bg-surface-container border border-outline-variant rounded-lg p-6 relative overflow-hidden group hover:border-cyber-blue/40 transition-colors text-left">
               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 text-cyber-blue animate-breathe">
                 <Radar className="h-16 w-16" />
@@ -678,7 +693,7 @@ export default function InterviewPage() {
                 <span className="text-lg text-on-surface-variant font-bold">%</span>
               </div>
               <div className="w-full bg-surface-dim h-1.5 rounded-full mt-4 overflow-hidden border border-outline-variant/30">
-                <div 
+                <div
                   className="bg-cyber-blue h-full rounded-full shadow-[0_0_10px_rgba(0,210,255,0.7)] transition-all duration-1000"
                   style={{ width: `${countUpMatch}%` }}
                 ></div>
@@ -701,9 +716,9 @@ export default function InterviewPage() {
                 <span className="text-lg text-on-surface-variant font-bold">/100</span>
               </div>
               <div className="w-full bg-surface-dim h-1.5 rounded-full mt-4 overflow-hidden border border-outline-variant/30">
-                <div 
+                <div
                   className="bg-white h-full rounded-full transition-all duration-1000"
-                  style={{ width: `${assessmentData ? assessmentData.communication_score : 92}%` }}
+                  style={{ width: `${assessmentData ? assessmentData.communication_score : 80}%` }}
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
@@ -711,26 +726,26 @@ export default function InterviewPage() {
               </p>
             </div>
 
-            {/* Tech Depth */}
+            {/* Role Fit / Technical Depth */}
             <div className="bg-surface-container border border-outline-variant rounded-lg p-6 relative overflow-hidden group hover:border-cyber-blue/40 transition-colors text-left">
               <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 text-cyber-blue">
                 <Bot className="h-16 w-16" />
               </div>
-              <h3 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest mb-4 font-semibold">Technical Depth</h3>
+              <h3 className="font-mono text-[10px] text-on-surface-variant uppercase tracking-widest mb-4 font-semibold">Role Fit Score</h3>
               <div className="flex items-baseline gap-1 mb-2 font-mono">
                 <span className="text-5xl font-bold text-white tracking-tighter">
-                  {assessmentData ? assessmentData.technical_score : (countUpMatch > 0 ? Math.round(countUpMatch * 0.886) : 0)}
+                  {assessmentData?.role_fit_score ?? (assessmentData ? assessmentData.technical_score : (countUpMatch > 0 ? Math.round(countUpMatch * 0.886) : 0))}
                 </span>
                 <span className="text-lg text-on-surface-variant font-bold">/100</span>
               </div>
               <div className="w-full bg-surface-dim h-1.5 rounded-full mt-4 overflow-hidden border border-outline-variant/30">
-                <div 
+                <div
                   className="bg-[#20202c] h-full rounded-full transition-all duration-1000"
-                  style={{ width: `${assessmentData ? assessmentData.technical_score : 78}%` }}
+                  style={{ width: `${assessmentData?.role_fit_score ?? (assessmentData ? assessmentData.technical_score : 70)}%` }}
                 ></div>
               </div>
               <p className="text-[10px] font-mono text-on-surface-variant mt-3 uppercase tracking-wider">
-                Strong engineering core demonstrated.
+                {assessmentData?.resume_strength_score != null ? `Resume Strength: ${assessmentData.resume_strength_score}%` : "Role alignment analysis."}
               </p>
             </div>
           </div>
@@ -753,15 +768,15 @@ export default function InterviewPage() {
                 <div className="animate-fade-slide-up">
                   <h4 className="font-sans text-base font-bold text-white mb-2">Executive Summary</h4>
                   <p className="text-on-surface-variant leading-relaxed">
-                    {assessmentData?.strengths.join(" ") || 
-                      "The candidate demonstrated relevant technical knowledge and communication skills throughout the interview. They successfully navigated the technical questions and showed the ability to articulate complex concepts clearly."}
+                    {assessmentData?.strengths.join(" ") ||
+                      "The candidate demonstrated relevant technical knowledge and communication skills throughout the interview."}
                   </p>
                 </div>
 
                 <div className="animate-fade-slide-up" style={{ animationDelay: "150ms" }}>
                   <h4 className="font-sans text-base font-bold text-white mb-2">AI Assessment Verdict</h4>
                   <p className="text-on-surface-variant leading-relaxed">
-                    {assessmentData?.verdict || 
+                    {assessmentData?.verdict ||
                       "Candidate shows foundational knowledge. Consider for the position based on team fit and specific requirements."}
                   </p>
                 </div>
@@ -774,6 +789,25 @@ export default function InterviewPage() {
                         <li key={i}>{s}</li>
                       ))}
                     </ul>
+                  </div>
+                )}
+
+                {assessmentData?.missing_skills && assessmentData.missing_skills.length > 0 && (
+                  <div className="animate-fade-slide-up" style={{ animationDelay: "450ms" }}>
+                    <h4 className="font-sans text-base font-bold text-white mb-2">Skill Gaps Identified</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {assessmentData.missing_skills.map((skill, i) => (
+                        <span
+                          key={i}
+                          className="px-2.5 py-1 bg-red-950/30 border border-red-500/20 rounded text-[11px] font-mono text-red-400"
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant/50 font-mono mt-2 uppercase tracking-wider">
+                      Skills required for the target role not demonstrated during interview
+                    </p>
                   </div>
                 )}
               </div>

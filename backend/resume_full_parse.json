@@ -1,0 +1,92 @@
+{
+    "candidate_name": "Abhineet Mukherjee",
+    "contact_info": "abhineet.mukherjee.ug23@nsut.ac.in, +91-9509429199, https://github.com/mukherjeeprakash17",
+    "experience": [
+        {
+            "company": "DSCL India Limited",
+            "role": "Accounts & Development Intern",
+            "duration": "June 2025 \u2013 July 2025",
+            "details": "Gained exposure to accounting and finance operations, developed an understanding of corporate reporting, financial workflows, and the role of finance. Acquired familiarity with SAP ERP and its application in integrating finance, procurement, and inventory functions."
+        }
+    ],
+    "education": [
+        {
+            "degree": "B.Tech. ICE",
+            "institution": "Netaji Subhas University of Technology",
+            "year": "2023-2027"
+        },
+        {
+            "degree": "Class XII",
+            "institution": "Shiv Jyoti Senior Secondary School, India",
+            "year": "2023"
+        },
+        {
+            "degree": "Class X",
+            "institution": "Saint Pauls School, India",
+            "year": "2021"
+        }
+    ],
+    "projects": [
+        {
+            "name": "ATS Resume Analyzer And Skill Gap Assessment System",
+            "technologies": [
+                "Python",
+                "NLP",
+                "Generative AI",
+                "LLM APIs",
+                "Resume Parsing",
+                "Scikit-learn"
+            ],
+            "description": "Developed an AI-powered Resume Analyzer using NLP and resume parsing techniques to extract candidate education, experience, projects, and skills from resumes. Designed an ATS-style scoring framework and integrated LLMs to identify skill gaps and generate personalized feedback."
+        },
+        {
+            "name": "Movie Recommender System (Netflix)",
+            "technologies": [
+                "Python",
+                "Pandas",
+                "NumPy",
+                "Scikit-learn",
+                "Streamlit",
+                "TMDB API"
+            ],
+            "description": "Built a content-based recommendation engine using the TMDB 5000 Movie Dataset, transforming raw movie data into actionable insights to improve content discovery and user engagement."
+        },
+        {
+            "name": "Autonomous Drone System \u2013 Tata Elxsi Teliport Challenge",
+            "technologies": [
+                "IMU",
+                "GNSS",
+                "Vision",
+                "UWB"
+            ],
+            "description": "Designed a high-level system architecture enabling autonomous takeoff and landing on a moving platform, addressing challenges related to navigation, stability, and operational safety."
+        }
+    ],
+    "certifications": [],
+    "gaps": [
+        {
+            "name": "Cloud Computing Skills",
+            "category": "Cloud",
+            "impact": 12,
+            "checked": false
+        },
+        {
+            "name": "DevOps Experience",
+            "category": "DevOps",
+            "impact": 10,
+            "checked": false
+        },
+        {
+            "name": "API Design Knowledge",
+            "category": "API Design",
+            "impact": 8,
+            "checked": false
+        },
+        {
+            "name": "Advanced Testing Skills",
+            "category": "Testing",
+            "impact": 9,
+            "checked": false
+        }
+    ]
+}

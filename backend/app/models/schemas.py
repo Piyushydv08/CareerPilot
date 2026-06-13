@@ -88,6 +88,7 @@ class InterviewRespondRequest(BaseModel):
 
 class InterviewRespondResponse(BaseModel):
     reply: str
+    phase: str = "technical"  # Current phase after this response (DB-authoritative)
 
 # --- Interview: Learning Path Models ---
 class GenerateLearningPathRequest(BaseModel):
@@ -109,8 +110,11 @@ class InterviewAssessResponse(BaseModel):
     overall_score: int
     technical_score: int
     communication_score: int
+    resume_strength_score: int = 0   # How strong the resume is for the target role
+    role_fit_score: int = 0          # Overall role-fit alignment score
     strengths: List[str]
     weaknesses: List[str]
+    missing_skills: List[str] = []   # Skills required by role not demonstrated
     verdict: str
 
 # --- Trend Analytics Models ---

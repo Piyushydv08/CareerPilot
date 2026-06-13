@@ -8,6 +8,6 @@
   "python.analysis.venvFolders": ["venv"],
   "python.envFile": "${workspaceFolder}/backend/.env",
   "[python]": {
-    "editor.defaultFormatter": "ms-python.black-formatter"
+    "editor.defaultFormatter": "ms-python.python"
   }
 }
