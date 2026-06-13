@@ -1,0 +1,79 @@
+{
+    "raw": {
+        "job_title": "Business Analyst Intern",
+        "department": "Retail Analytics, Data & AI",
+        "seniority_level": "Intern",
+        "technical_skills": [
+            "SQL",
+            "AI tools"
+        ],
+        "soft_skills": [
+            "Analytical thinking",
+            "Business acumen",
+            "Problem-solving ability",
+            "Presentation skills",
+            "Communication skills",
+            "Structured thinking",
+            "Attention to detail"
+        ],
+        "experience_requirements": {
+            "minimum_years": 0,
+            "maximum_years": 0,
+            "required_domains": [],
+            "preferred_domains": []
+        },
+        "education_requirements": {
+            "required_degrees": [
+                "B.Tech"
+            ],
+            "preferred_degrees": [],
+            "required_fields_of_study": [],
+            "preferred_fields_of_study": []
+        },
+        "certification_requirements": {
+            "required_certifications": [],
+            "preferred_certifications": []
+        },
+        "project_requirements": [
+            "Retail analytics projects",
+            "Business intelligence projects",
+            "AI projects"
+        ],
+        "responsibilities": [
+            "Analyze business problems",
+            "Extract, clean, and analyze data",
+            "Leverage AI tools for analysis",
+            "Identify trends and insights",
+            "Prepare reports and presentations",
+            "Conduct market and competitor research"
+        ],
+        "preferred_skills": [],
+        "keywords": [
+            "Retail analytics",
+            "Data",
+            "AI",
+            "Business intelligence"
+        ]
+    },
+    "normalized": {
+        "technical_skills": [
+            "SQL",
+            "AI tools"
+        ],
+        "soft_skills": [
+            "Analytical Thinking",
+            "Business Acumen",
+            "Problem-Solving Ability",
+            "Presentation Skills",
+            "Communication",
+            "Structured Thinking",
+            "Attention To Detail"
+        ],
+        "keywords": [
+            "Retail Analytics",
+            "Data",
+            "Artificial Intelligence",
+            "Business Intelligence"
+        ]
+    }
+}

@@ -38,6 +38,8 @@ export interface ATSMatchDetail {
   is_ai_powered: boolean;
   missing_skills: string[];   // jd_skills − resume_skills (canonical, normalized)
   matched_skills: string[];   // jd_skills ∩ resume_skills
+  parsed_resume?: any;
+  parsed_jd?: any;
 }
 
 export interface ChatMessage {
@@ -72,7 +74,7 @@ interface ProjectContextType {
   sendInterviewMessage: (text: string) => Promise<void>;
   startInterviewSession: (jobDesc?: string) => Promise<string | null>;
   resetInterview: () => void;
-  toggleSkillGap: (index: number) => void;
+  toggleSkillGap: (index: number) => Promise<void>;
   addTerminalLog: (type: "INFO" | "EXEC" | "WARN", message: string) => void;
 }
 
@@ -199,6 +201,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           is_ai_powered: data.is_ai_powered || false,
           missing_skills: data.missing_skills || data.gap_skills || [],
           matched_skills: data.matched_skills || [],
+          parsed_resume: data.parsed_resume,
+          parsed_jd: data.parsed_jd,
         });
 
         // Populate resumeData.gaps from missing_skills (true JD-vs-resume gap, never resume-parser gaps)
@@ -262,7 +266,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   // Toggle Skill checkboxes in Simulator
-  const toggleSkillGap = (index: number) => {
+  const toggleSkillGap = async (index: number) => {
     if (!resumeData) return;
 
     const updatedGaps = [...resumeData.gaps];
@@ -274,11 +278,39 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       gaps: updatedGaps
     });
 
+    // If we have parsed structures, call the live simulation endpoint
+    if (atsMatchDetail?.parsed_resume && atsMatchDetail?.parsed_jd) {
+      const simulatedSkills = updatedGaps.filter(g => g.checked).map(g => g.name);
+      addTerminalLog("EXEC", `Simulated gap update: ${updatedGaps[index].name} (${!previousState ? 'fulfilled' : 'removed'}). Recalculating ATS score live...`);
+
+      try {
+        const response = await fetch(`${BASE_URL}/match/simulate_score`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            parsed_resume: atsMatchDetail.parsed_resume,
+            parsed_jd: atsMatchDetail.parsed_jd,
+            simulated_technical_skills: simulatedSkills
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setMatchScore(data.match_score);
+          addTerminalLog("INFO", `Live recalculation complete. New Score: ${data.match_score}%`);
+          return;
+        }
+      } catch (e) {
+        console.error("Simulation endpoint failed", e);
+      }
+    }
+
+    // Fallback: Artificial score update if backend fails or structures missing
     const impact = updatedGaps[index].impact;
     setMatchScore(prev => {
       const direction = !previousState ? 1 : -1;
       const newScore = Math.min(Math.max(prev + (direction * impact), 0), 100);
-      addTerminalLog("EXEC", `Simulated gap update: ${updatedGaps[index].name} (${!previousState ? 'fulfilled' : 'removed'}). Adjusting Match score by ${!previousState ? '+' : '-'}${impact}%.`);
+      addTerminalLog("EXEC", `Fallback simulated update: ${updatedGaps[index].name}. Score: ${newScore}%`);
       return newScore;
     });
   };

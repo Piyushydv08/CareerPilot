@@ -18,8 +18,16 @@ from app.models.schemas import (
     MatchAnalysisResponse,
     ATSCategoryScores,
     MissingTerm,
+    SimulateScoreRequest,
+    SimulateScoreResponse,
 )
 from app.core.database import get_database
+from app.core.normalization import (
+    normalize_technical_skill, normalize_soft_skill, normalize_keyword, 
+    normalize_certification, normalize_project_domain, normalize_education_degree, 
+    normalize_education_field, normalize_job_title, deduplicate_normalized_list
+)
+from app.core.scoring import calculate_comprehensive_ats_score
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/match", tags=["matching"])
@@ -54,74 +62,113 @@ async def call_llama(system_prompt: str, user_content: str) -> str:  # Groq llam
 
 
 # ── JD skill-extraction prompt (per ATS redesign spec) ───────────────────────
-JD_SKILL_EXTRACTION_PROMPT = """You are an ATS job description parser.
+JD_SKILL_EXTRACTION_PROMPT = """You are an Expert ATS Job Description Parser.
 
-Extract ONLY technical skills, technologies, frameworks, cloud services, databases, tools, programming languages and certifications explicitly required by the job description.
+Analyze the provided Job Description and extract ALL hiring requirements mentioned.
 
-Return ONLY valid JSON.
+Your goal is to identify:
 
-Format:
+1. Technical Skills
+   * Programming languages
+   * Frameworks
+   * Libraries
+   * Databases
+   * Cloud platforms
+   * Tools
+   * Software
+   * Technologies
+   * Certifications
+   * Technical methodologies
+
+2. Soft Skills
+   * Communication
+   * Leadership
+   * Analytical Thinking
+   * Problem Solving
+   * Critical Thinking
+   * Presentation Skills
+   * Teamwork
+   * Collaboration
+   * Adaptability
+   * Stakeholder Management
+   * Time Management
+   * Any behavioral or interpersonal skill explicitly mentioned
+
+3. Experience Requirements
+   * Minimum years of experience
+   * Maximum years of experience
+   * Experience domains
+   * Required industry experience
+   * Preferred industry experience
+
+4. Education Requirements
+   * Degrees
+   * Branches / Majors
+   * Required education
+   * Preferred education
+
+5. Certification Requirements
+   * Required certifications
+   * Preferred certifications
+
+6. Project Requirements
+   * Types of projects expected
+   * Domain-specific projects
+   * Hands-on experience requirements
+
+7. Responsibilities
+   * Major job responsibilities
+   * Key duties
+
+8. Role Metadata
+   * Job title
+   * Department
+   * Seniority level
+
+IMPORTANT RULES
+* Extract ONLY information explicitly mentioned.
+* Do NOT invent requirements.
+* Do NOT infer missing information.
+* Remove duplicates.
+* Standardize skill names whenever possible.
+* Return ONLY valid JSON.
+* No markdown.
+* No explanations.
+* No comments.
+
+OUTPUT FORMAT
 {
-  "skills": [
-    "React",
-    "Node.js",
-    "AWS",
-    "Docker"
-  ]
+"job_title": "",
+"department": "",
+"seniority_level": "",
+"technical_skills": [],
+"soft_skills": [],
+"experience_requirements": {
+"minimum_years": 0,
+"maximum_years": 0,
+"required_domains": [],
+"preferred_domains": []
+},
+"education_requirements": {
+"required_degrees": [],
+"preferred_degrees": [],
+"required_fields_of_study": [],
+"preferred_fields_of_study": []
+},
+"certification_requirements": {
+"required_certifications": [],
+"preferred_certifications": []
+},
+"project_requirements": [],
+"responsibilities": [],
+"preferred_skills": [],
+"keywords": []
 }
 
+Return ONLY the JSON object.
+No markdown fences.
 No explanations.
-No markdown.
-No confidence scores.
-No additional text."""
-
-
-# ── Skill normalization map (canonical names) ─────────────────────────────────
-SKILL_NORM_MAP: dict[str, str] = {
-    "react": "React", "react.js": "React",
-    "node": "Node.js", "nodejs": "Node.js", "node.js": "Node.js",
-    "mongodb": "MongoDB", "mongo": "MongoDB",
-    "aws": "AWS", "amazon web services": "AWS", "aws ec2": "AWS",
-    "gcp": "GCP", "google cloud": "GCP", "google cloud platform": "GCP",
-    "azure": "Azure", "microsoft azure": "Azure",
-    "javascript": "JavaScript", "js": "JavaScript",
-    "typescript": "TypeScript", "ts": "TypeScript",
-    "docker": "Docker",
-    "kubernetes": "Kubernetes", "k8s": "Kubernetes",
-    "graphql": "GraphQL",
-    "postgresql": "PostgreSQL", "postgres": "PostgreSQL",
-    "mysql": "MySQL", "redis": "Redis", "git": "Git",
-    "vue": "Vue.js", "vue.js": "Vue.js",
-    "angular": "Angular",
-    "next.js": "Next.js", "nextjs": "Next.js",
-    "express": "Express.js", "express.js": "Express.js",
-    "django": "Django", "flask": "Flask", "fastapi": "FastAPI",
-    "java": "Java", "kotlin": "Kotlin", "swift": "Swift",
-    "go": "Go", "golang": "Go", "rust": "Rust",
-    "html": "HTML", "html5": "HTML", "css": "CSS", "css3": "CSS",
-    "tailwind": "Tailwind CSS", "tailwindcss": "Tailwind CSS",
-    "jenkins": "Jenkins", "terraform": "Terraform", "ansible": "Ansible",
-    "kafka": "Apache Kafka", "elasticsearch": "Elasticsearch",
-    "nginx": "Nginx", "linux": "Linux", "python": "Python",
-    "ci/cd": "CI/CD", "rest": "REST APIs", "rest api": "REST APIs", "restful": "REST APIs",
-    "c++": "C++", "cpp": "C++", "c#": "C#", "csharp": "C#",
-}
-
-
-def normalize_skill(skill: str) -> str:  # Return canonical name or title-cased original
-    return SKILL_NORM_MAP.get(skill.lower().strip(), skill.strip())
-
-
-def deduplicate_skills(skills: list[str]) -> list[str]:
-    """Remove duplicates from a skill list, case-insensitively, preserving first occurrence."""
-    seen: set[str] = set()
-    result: list[str] = []
-    for skill in skills:
-        normalized = skill.strip().lower()
-        if normalized not in seen:
-            seen.add(normalized)
-            result.append(skill.strip())
-    return result
+No extra text."""
 
 
 def extract_json(text: str) -> dict:
@@ -439,7 +486,7 @@ async def analyze_match_score(
             suggestions=ats.get("recommendations", [])[:5],
             missing_terms=[],
             is_ai_powered=not IS_GEMINI_MOCK,
-            resume_skills=deduplicate_skills(resume_skills_only),
+            resume_skills=deduplicate_normalized_list(resume_skills_only),
             jd_skills=[],
             matched_skills=[],
             missing_skills=[],
@@ -448,71 +495,122 @@ async def analyze_match_score(
 
     # ── Call B: JD skill extraction via Llama ─────────────────────────────────
     jd_skills: list[str] = []
+    jd_soft_skills: list[str] = []
+    parsed_jd_final = None
     if not IS_GROQ_MOCK:
         try:
             raw_jd_response = await call_llama(JD_SKILL_EXTRACTION_PROMPT, job_description[:5000])
-            parsed_jd = extract_json(raw_jd_response)
-            # New prompt returns {"skills": [...]}, old prompt returns [...]
-            if isinstance(parsed_jd, dict) and "skills" in parsed_jd:
-                raw_list = parsed_jd["skills"]
-            elif isinstance(parsed_jd, list):
-                raw_list = parsed_jd
-            else:
-                raw_list = []
-            jd_skills = [normalize_skill(s) for s in raw_list if isinstance(s, str)]
-            logger.info(f"Llama extracted {len(jd_skills)} JD skills.")
+            raw_jd_parsed = extract_json(raw_jd_response)
+            
+            # Apply Normalization Layer for JD
+            normalized_jd_tech = deduplicate_normalized_list([normalize_technical_skill(s) for s in raw_jd_parsed.get("technical_skills", [])])
+            normalized_jd_soft = deduplicate_normalized_list([normalize_soft_skill(s) for s in raw_jd_parsed.get("soft_skills", [])])
+            normalized_jd_keywords = deduplicate_normalized_list([normalize_keyword(s) for s in raw_jd_parsed.get("keywords", [])])
+            
+            parsed_jd_final = {
+                "raw": raw_jd_parsed,
+                "normalized": {
+                    "technical_skills": normalized_jd_tech,
+                    "soft_skills": normalized_jd_soft,
+                    "keywords": normalized_jd_keywords,
+                }
+            }
+            
+            jd_skills = normalized_jd_tech
+            jd_soft_skills = normalized_jd_soft
+            logger.info(f"Llama extracted {len(jd_skills)} JD skills and {len(jd_soft_skills)} JD soft skills.")
+            
+            # Save for debugging
+            with open("jd_full_parse.json", "w", encoding="utf-8") as f:
+                json.dump(parsed_jd_final, f, indent=4)
         except Exception as e:
             logger.error(f"Llama JD skill extraction failed: {e}")
-            jd_skills = [normalize_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])]
+            jd_skills = deduplicate_normalized_list([normalize_technical_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])])
     else:
-        jd_skills = [normalize_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])]
+        jd_skills = deduplicate_normalized_list([normalize_technical_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])])
 
     # ── Resume skills: prefer Gemini's technical_skills, fall back to payload skills ──
     raw_resume_skills: list[str] = []
-    parsed_tech = resume_data_parsed.get("technical_skills", [])
-    if isinstance(parsed_tech, list) and parsed_tech:
-        raw_resume_skills = [s for s in parsed_tech if isinstance(s, str)]
-    elif payload.resume and payload.resume.skills:
-        raw_resume_skills = [s.name for s in payload.resume.skills]
-    resume_skills = [normalize_skill(s) for s in raw_resume_skills]
+    raw_resume_soft_skills: list[str] = []
+    
+    # Check if we have the new nested normalized schema
+    if "normalized" in resume_data_parsed and isinstance(resume_data_parsed["normalized"], dict):
+        raw_resume_skills = resume_data_parsed["normalized"].get("technical_skills", [])
+        raw_resume_soft_skills = resume_data_parsed["normalized"].get("soft_skills", [])
+    else:
+        parsed_tech = resume_data_parsed.get("technical_skills", [])
+        if isinstance(parsed_tech, list) and parsed_tech:
+            raw_resume_skills = [s for s in parsed_tech if isinstance(s, str)]
+        elif payload.resume and payload.resume.skills:
+            raw_resume_skills = [s.name for s in payload.resume.skills]
+            
+        parsed_soft = resume_data_parsed.get("soft_skills", [])
+        if isinstance(parsed_soft, list) and parsed_soft:
+            raw_resume_soft_skills = [s for s in parsed_soft if isinstance(s, str)]
+            
+    resume_skills = deduplicate_normalized_list([normalize_technical_skill(s) for s in raw_resume_skills])
+    resume_soft_skills = deduplicate_normalized_list([normalize_soft_skill(s) for s in raw_resume_soft_skills])
 
     # ── Set-difference gap computation ───────────────────────────────────────
     resume_set = {s.lower() for s in resume_skills}
     jd_lower_map = {s.lower(): s for s in jd_skills}  # lowercase → canonical
     missing_skills = [jd_lower_map[k] for k in jd_lower_map if k not in resume_set]
     matched_skills = [jd_lower_map[k] for k in jd_lower_map if k in resume_set]
+    
+    resume_soft_set = {s.lower() for s in resume_soft_skills}
+    jd_soft_lower_map = {s.lower(): s for s in jd_soft_skills}
+    missing_soft_skills = [jd_soft_lower_map[k] for k in jd_soft_lower_map if k not in resume_soft_set]
 
-    # ── Build legacy response structure (for current frontend) ────────────────
-    match_score = int(ats.get("ats_score", 0))
+    # ── Build response structure (using deterministic scoring) ────────────────
     is_ai_powered = not IS_GEMINI_MOCK
 
-    # Map category scores (from new schema to old 5 categories)
-    category_scores = _build_category_scores(ats)
+    if parsed_jd_final:
+        deterministic_ats = calculate_comprehensive_ats_score(resume_data_parsed, parsed_jd_final)
+        match_score = deterministic_ats.get("ats_score", 0)
+        category_scores_dict = deterministic_ats.get("breakdown", {})
+        category_scores = ATSCategoryScores(
+            skills_match=category_scores_dict.get("skills_match", 0),
+            experience_relevance=category_scores_dict.get("experience_relevance", 0),
+            keyword_density=category_scores_dict.get("keyword_density", 0),
+            education_certifications=category_scores_dict.get("education_certifications", 0),
+            formatting_completeness=category_scores_dict.get("formatting_completeness", 0)
+        )
+    else:
+        # Fallback to AI-generated or mock score if no JD
+        match_score = int(ats.get("ats_score", 0))
+        category_scores = _build_category_scores(ats)
 
     # Use ONLY the set-difference computed matched_skills/missing_skills for keyword lists.
     # This guarantees the displayed keywords are strictly JD ∩ Resume and JD − Resume,
     # never generic AI-recommended skills from Gemini's analysis.
     if jd_skills:
         # JD skills were extracted — use the set-diff results exclusively
-        matched_keywords = deduplicate_skills(matched_skills)
-        missing_keywords = deduplicate_skills(missing_skills)
+        matched_keywords = deduplicate_normalized_list(matched_skills)
+        missing_keywords = deduplicate_normalized_list(missing_skills)
     elif ats.get("job_description_provided"):
         # Fallback to Gemini analysis fields when Groq JD extraction was unavailable
-        matched_keywords = deduplicate_skills(ats.get("matched_skills", []) + ats.get("matching_keywords", []))
-        missing_keywords = deduplicate_skills(ats.get("missing_skills", []) + ats.get("missing_keywords", []))
+        matched_keywords = deduplicate_normalized_list(ats.get("matched_skills", []) + ats.get("matching_keywords", []))
+        missing_keywords = deduplicate_normalized_list(ats.get("missing_skills", []) + ats.get("missing_keywords", []))
     else:
-        matched_keywords = deduplicate_skills(ats.get("matching_keywords", []))
-        missing_keywords = deduplicate_skills(ats.get("missing_keywords", []))
+        matched_keywords = deduplicate_normalized_list(ats.get("matching_keywords", []))
+        missing_keywords = deduplicate_normalized_list(ats.get("missing_keywords", []))
 
     suggestions = ats.get("recommendations", [])
+    if missing_skills:
+        for ms in missing_skills:
+            suggestions.append(f"Please focus on improvising {ms}")
+            
+    if missing_soft_skills:
+        for ms in missing_soft_skills:
+            suggestions.append(f"Please focus on improvising {ms}")
 
     # ── Deduplicate all skill lists before returning ──────────────────────────
-    resume_skills = deduplicate_skills(resume_skills)
-    jd_skills = deduplicate_skills(jd_skills)
-    matched_skills = deduplicate_skills(matched_skills)
-    missing_skills = deduplicate_skills(missing_skills)
-    matched_keywords = deduplicate_skills(matched_keywords)
-    missing_keywords = deduplicate_skills(missing_keywords)
+    resume_skills = deduplicate_normalized_list(resume_skills)
+    jd_skills = deduplicate_normalized_list(jd_skills)
+    matched_skills = deduplicate_normalized_list(matched_skills)
+    missing_skills = deduplicate_normalized_list(missing_skills)
+    matched_keywords = deduplicate_normalized_list(matched_keywords)
+    missing_keywords = deduplicate_normalized_list(missing_keywords)
 
     # ── Debug logging to verify the ATS calculation pipeline ─────────────────
     logger.debug("RESUME SKILLS: %s", resume_skills)
@@ -547,4 +645,41 @@ async def analyze_match_score(
         matched_skills=matched_skills,
         missing_skills=missing_skills,
         gap_skills=missing_skills,  # backward compat alias
+        parsed_resume=resume_data_parsed,
+        parsed_jd=parsed_jd_final or {},
     )
+
+@router.post("/simulate_score", response_model=SimulateScoreResponse)
+async def simulate_score(payload: SimulateScoreRequest):
+    """
+    Lightweight endpoint to instantly recalculate the ATS score
+    when the frontend simulator injects temporary skills.
+    """
+    import copy
+    
+    # Deep copy to avoid mutating the original
+    simulated_resume = copy.deepcopy(payload.parsed_resume)
+    
+    # Inject simulated skills into the normalized technical skills array
+    if "normalized" not in simulated_resume:
+        simulated_resume["normalized"] = {}
+    
+    existing_tech = simulated_resume["normalized"].get("technical_skills", [])
+    simulated_resume["normalized"]["technical_skills"] = existing_tech + payload.simulated_technical_skills
+    
+    # Run the exact mathematical engine
+    deterministic_ats = calculate_comprehensive_ats_score(simulated_resume, payload.parsed_jd)
+    
+    category_scores_dict = deterministic_ats.get("breakdown", {})
+    category_scores = ATSCategoryScores(
+        skills_match=category_scores_dict.get("skills_match", 0),
+        experience_relevance=category_scores_dict.get("experience_relevance", 0),
+        keyword_density=category_scores_dict.get("keyword_density", 0),
+        education_certifications=category_scores_dict.get("education_certifications", 0),
+        formatting_completeness=category_scores_dict.get("formatting_completeness", 0)
+    )
+    
+    return SimulateScoreResponse(
+        match_score=deterministic_ats.get("ats_score", 0),
+        category_scores=category_scores
+    )

@@ -40,6 +40,12 @@ async def call_llama(system_prompt: str, user_content: str) -> str:  # Groq llam
 
 
 # ── JSON extraction helper ─────────────────────────────────────────────────────
+from app.core.normalization import (
+    normalize_technical_skill, normalize_soft_skill, normalize_keyword, 
+    normalize_certification, normalize_project_domain, normalize_education_degree, 
+    normalize_education_field, normalize_job_title, deduplicate_normalized_list
+)
+from app.core.scoring import calculate_resume_quality_v2
 from typing import Any
 def extract_json(text: str) -> Any:  # Strip markdown fences and parse JSON from model response
     text = text.strip()
@@ -63,83 +69,249 @@ def _try_json_loads(text: str) -> dict | list | None:  # Returns parsed object o
 
 
 # ── Resume skill-extraction system prompt ─────────────────────────────────────
-RESUME_SKILL_EXTRACTION_PROMPT = """\
-You are a Senior Hiring Manager, Domain Expert and Technical Interviewer reviewing candidate resumes.
+COMPREHENSIVE_RESUME_PROMPT = """\
+You are an Expert Resume Parser, ATS Evaluator, and Technical Recruiter.
 
-Your task is to identify the candidate's demonstrated competencies from projects, experience, education,
-certifications and technical work. Extract all relevant skills that a recruiter would consider while
-evaluating the candidate. Do not simply collect keywords — focus on actual competencies evidenced
-within the resume.
+Analyze the resume and extract all candidate information.
 
-Return ONLY valid JSON matching this exact schema:
+Your task is NOT to evaluate the candidate.
+
+Your task is ONLY to extract information present in the resume and organize it into a structured JSON format.
+
+IMPORTANT RULES
+
+1. Extract ONLY information that is present in the resume.
+2. Never invent skills, education, certifications, experience, projects, or achievements.
+3. If information is missing, return empty arrays, empty strings, or zero values.
+4. Remove duplicates.
+5. Standardize common technology names whenever possible.
+6. Infer categories only when clearly supported by the resume.
+7. Return ONLY valid JSON.
+8. Do not return markdown.
+9. Do not return explanations.
+10. Do not return comments.
+
+---
+
+## INFORMATION TO EXTRACT
+
+1. Candidate Information
+
+* Full name
+* Email
+* Phone number
+* Location
+* LinkedIn URL
+* GitHub URL
+* Portfolio URL
+
+2. Professional Summary
+
+* Short summary of the candidate profile
+
+3. Technical Skills
+
+Extract:
+
+* Programming languages
+* Frameworks
+* Libraries
+* Databases
+* Cloud platforms
+* Tools
+* Technologies
+* Software
+* Methodologies
+
+Examples:
+
+Python
+Java
+SQL
+React
+Node.js
+AWS
+Power BI
+Tableau
+Docker
+Kubernetes
+
+4. Soft Skills
+
+Extract ONLY if explicitly mentioned or strongly demonstrated.
+
+Examples:
+
+Communication
+Leadership
+Problem Solving
+Analytical Thinking
+Presentation Skills
+Teamwork
+Stakeholder Management
+Critical Thinking
+Adaptability
+
+5. Experience
+
+Extract:
+
+* Total years of experience
+* Individual work experiences
+
+For each experience extract:
+
+* Company
+* Designation
+* Duration
+* Description
+* Skills used
+
+6. Education
+
+Extract:
+
+* Degree
+* Field of study
+* Institution
+* Graduation year
+
+Examples:
+
+Bachelor of Technology
+Bachelor of Science
+Master of Science
+MBA
+
+7. Certifications
+
+Extract:
+
+* All certifications listed
+
+Examples:
+
+AWS Certified Cloud Practitioner
+Google Data Analytics
+Microsoft Power BI Certification
+
+8. Projects
+
+For each project extract:
+
+* Project name
+* Description
+* Technologies used
+* Domain
+
+Examples of domains:
+
+Data Analytics
+
+Machine Learning And Artifical Intelligence
+
+Web Development
+Cloud Computing                                            Data Scientist                                                     Software Engineer                                               Software Developer
+Cyber Security
+Mobile Development
+
+9. Achievements
+
+Extract:
+
+* Awards
+* Rankings
+* Scholarships
+* Competition wins
+* Significant accomplishments
+
+10. Keywords
+
+Extract all major ATS keywords present in the resume.
+
+Examples:
+
+Python
+Machine Learning
+Dashboard
+Data Analysis
+SQL
+AWS
+
+---
+
+## OUTPUT FORMAT
+
 {
-  "technical_skills": [],
-  "domain_tools": [],
-  "behavioral_indicators": [],
-  "representative_skills": []
+"candidate_name": "",
+
+"email": "",
+
+"phone": "",
+
+"location": "",
+
+"linkedin": "",
+
+"github": "",
+
+"portfolio": "",
+
+"summary": "",
+
+"technical_skills": [],
+
+"soft_skills": [],
+
+"experience": {
+"total_years": 0,
+
+"roles": [
+  {
+    "company": "",
+    "designation": "",
+    "duration": "",
+    "description": "",
+    "skills_used": []
+  }
+]
+
+},
+
+"education": [
+{
+"degree": "",
+"field_of_study": "",
+"institution": "",
+"year": ""
+}
+],
+
+"certifications": [],
+
+"projects": [
+{
+"project_name": "",
+"description": "",
+"technologies": [],
+"domain": ""
+}
+],
+
+"achievements": [],
+
+"keywords": []
 }
 
-CATEGORY DEFINITIONS:
+Return ONLY the JSON object.
 
-technical_skills — Hard competencies demonstrated through projects, experience, certifications,
-  coursework or technical activities. Include ALL of the following types:
-  Programming: Python, Java, C++, JavaScript, TypeScript, Go, Rust, Kotlin, Swift, Scala
-  Web frameworks: React, Node.js, Express.js, Next.js, Django, FastAPI, Flask, Vue.js, Angular
-  Databases: SQL, PostgreSQL, MongoDB, MySQL, Redis, Elasticsearch, SQLite
-  Data/ML: Pandas, NumPy, Matplotlib, Seaborn, Scikit-Learn, TensorFlow, PyTorch, Keras,
-           OpenCV, NLTK, spaCy, XGBoost, LightGBM, Power BI, Tableau, Excel
-  Cloud/Infra: AWS, Azure, GCP, Docker, Kubernetes, Terraform, Ansible, Jenkins, CI/CD
-  Security/Auth: JWT, OAuth, bcrypt, SSL/TLS
-  Other: Git, Linux, HTML, CSS, Tailwind CSS, REST APIs, GraphQL, Socket.IO, WebSockets
+Do not include markdown.
 
-PYTHON LIBRARY RULE (CRITICAL):
-The following MUST always be classified as technical_skills — NEVER as domain_tools or behavioral_indicators:
-  Pandas, NumPy, Matplotlib, Seaborn, Scikit-Learn, TensorFlow, PyTorch, Keras,
-  OpenCV, NLTK, spaCy, FastAPI, Flask, Django
+Do not include explanations.
 
-domain_tools — Professional software platforms used within a domain (NOT technical competencies):
-  Examples: Jira, Confluence, HubSpot, Trello, Asana, ServiceNow, Notion, Slack, Postman, VSCode
-  Note: Postman and VSCode are tools, not technical skills.
+Do not include comments.
 
-behavioral_indicators — Personal, workplace or interpersonal capabilities:
-  Examples: Leadership, Communication, Problem Solving, Stakeholder Management,
-            Teamwork, Presentation Skills, Attention to Detail
-
-representative_skills — The most representative technical skills for UI display (8-12 items max).
-  Prefer skills that best answer: "Which technologies would a recruiter notice in 5-10 seconds?"
-
-  RANKING PRIORITY (apply in this order when selecting representative_skills):
-  Tier 1 — Core Technologies (HIGHEST PRIORITY, select first):
-    Programming Languages: Python, Java, JavaScript, TypeScript, C++, C#, Go, Kotlin, Swift, SQL
-    Major Frameworks: React, Node.js, Express.js, Next.js, FastAPI, Django, Flask, Vue.js, Angular,
-                      Spring Boot, Laravel
-    Primary Databases: MongoDB, PostgreSQL, MySQL, Redis
-    ML/AI Frameworks: Scikit-Learn, TensorFlow, PyTorch, Keras
-    Analytics Tools: Power BI, Tableau
-    Cloud/Infra: AWS, Azure, GCP, Docker, Kubernetes
-
-  Tier 2 — Major Libraries & Platforms (select after Tier 1):
-    Pandas, NumPy, Matplotlib, Seaborn, OpenCV, spaCy, NLTK, XGBoost, LightGBM,
-    Redux, Tailwind CSS, Bootstrap, Firebase, Elasticsearch
-
-  Tier 3 — Supporting Technologies (include only if space remains after Tier 1+2):
-    JWT, OAuth, Socket.IO, REST APIs, GraphQL, WebSockets, bcrypt, Multer,
-    Git, Linux, HTML, CSS, GitHub Actions, Webpack, Vite
-
-  EXAMPLE — MERN Stack Developer:
-  Technical skills: JavaScript, React, Node.js, Express.js, MongoDB, Socket.IO, JWT, REST APIs, Redux, Git
-  Poor representative: [JavaScript, React, Node.js, Socket.IO, JWT, REST APIs]
-  CORRECT representative: [JavaScript, React, Node.js, Express.js, MongoDB, Redux, Git]
-
-  EXAMPLE — Data Science:
-  Technical skills: Python, Pandas, NumPy, Matplotlib, Scikit-Learn, TensorFlow, Power BI, SQL
-  CORRECT representative: [Python, SQL, Scikit-Learn, TensorFlow, Power BI, Pandas]
-  (NOT Matplotlib, NumPy alone — recruiters care about ML frameworks and analytics tools first)
-
-  Return representative_skills as plain strings: ["React", "Node.js", "MongoDB", ...]
-  Maximum 12 items. Minimum 6 items.
-
-Return ONLY raw JSON, no markdown, no explanation.
+Do not include additional text.
 """
 
 
@@ -706,113 +878,104 @@ async def upload_resume(
         resume_soft_skills = validated_mock["behavioral_indicators"]
         parsed_data_json = mock_data
     else:
-        # ── Call A: Recruiter-grade structured skill extraction via Llama ─────────
+        # ── Call A: Comprehensive Structured Resume Parse via Llama ─────────
         try:
             raw_llama_response = await call_llama(
-                system_prompt=RESUME_SKILL_EXTRACTION_PROMPT,
+                system_prompt=COMPREHENSIVE_RESUME_PROMPT,
                 user_content=raw_text[:6000],
             )
-            parsed_llama = extract_json(raw_llama_response)
+            raw_parsed = extract_json(raw_llama_response)
+            
+            # Apply Normalization Layer
+            normalized_tech = deduplicate_normalized_list([normalize_technical_skill(s) for s in raw_parsed.get("technical_skills", [])])
+            normalized_soft = deduplicate_normalized_list([normalize_soft_skill(s) for s in raw_parsed.get("soft_skills", [])])
+            normalized_keywords = deduplicate_normalized_list([normalize_keyword(s) for s in raw_parsed.get("keywords", [])])
+            normalized_certs = deduplicate_normalized_list([normalize_certification(s) for s in raw_parsed.get("certifications", [])])
+            normalized_projects = deduplicate_normalized_list([normalize_project_domain(p.get("domain", "")) for p in raw_parsed.get("projects", []) if isinstance(p, dict)])
+            normalized_degrees = deduplicate_normalized_list([normalize_education_degree(e.get("degree", "")) for e in raw_parsed.get("education", []) if isinstance(e, dict)])
+            normalized_fields = deduplicate_normalized_list([normalize_education_field(e.get("field_of_study", "")) for e in raw_parsed.get("education", []) if isinstance(e, dict)])
+            normalized_titles = deduplicate_normalized_list([normalize_job_title(r.get("designation", "")) for r in raw_parsed.get("experience", {}).get("roles", []) if isinstance(r, dict)])
+            
+            # Construct Final Resume Parser Output
+            parsed_data_json: dict[str, Any] = {
+                "raw": raw_parsed,
+                "normalized": {
+                    "technical_skills": normalized_tech,
+                    "soft_skills": normalized_soft,
+                    "keywords": normalized_keywords,
+                    "certifications": normalized_certs,
+                    "project_domains": normalized_projects,
+                    "education_degrees": normalized_degrees,
+                    "education_fields": normalized_fields,
+                    "job_titles": normalized_titles,
+                    "experience_domains": []
+                }
+            }
 
-            # Handle both new structured format and legacy flat array
-            if isinstance(parsed_llama, dict):
-                # New structured 4-field format
-                validated = validate_resume_extraction(parsed_llama)
-                resume_technical_skills = validated["technical_skills"]
-                resume_representative_skills = validated["representative_skills"]
-                resume_soft_skills = validated["behavioral_indicators"]
-            elif isinstance(parsed_llama, list):
-                # Legacy flat array fallback (LLM returned old format)
-                logger.warning("Groq returned legacy flat array — applying structured fallback.")
-                resume_technical_skills = parsed_llama
-                resume_representative_skills = sorted(
-                    parsed_llama,
-                    key=lambda s: s.get("confidence", 50) if isinstance(s, dict) else 50,
-                    reverse=True,
-                )[:8]
-            else:
-                resume_technical_skills = []
-                resume_representative_skills = []
+            resume_technical_skills = normalized_tech
+            resume_soft_skills = normalized_soft
+            
+            # Rank representative skills from the extracted technical skills
+            resume_representative_skills = rank_representative_skills(resume_technical_skills, [], max_count=10)
 
             # Write debug output
-            debug_output = {
-                "technical_skills": resume_technical_skills,
-                "representative_skills": resume_representative_skills,
-            }
-            with open("resume_skill_extraction.json", "w", encoding="utf-8") as f:
-                f.write(json.dumps(debug_output, indent=2, ensure_ascii=False))
-            logger.info(
-                f"Groq extracted {len(resume_technical_skills)} technical skills, "
-                f"{len(resume_representative_skills)} representative skills from resume."
-            )
-        except Exception as e:
-            logger.error(f"Groq skill extraction failed: {e}. Using text-scan fallback.")
-            fallback = generate_mock_resume_data(raw_text).get("skills", [])
-            resume_technical_skills = fallback
-            resume_representative_skills = fallback[:8]
-
-        # ── Call B: Full structured parse (experience, contact, education, projects) ─
-        FULL_PARSE_PROMPT = """\
-You are an expert HR parser. Extract structured data from the raw resume text into this exact JSON schema:
-{
-  "candidate_name": "string",
-  "contact_info": "string (email, phone, LinkedIn, GitHub — comma separated)",
-  "experience": [
-    {
-      "company": "str",
-      "role": "str",
-      "duration": "str",
-      "details": "str (bulleted metrics combined)"
-    }
-  ],
-  "education": [
-    {
-      "degree": "str",
-      "institution": "str",
-      "year": "str"
-    }
-  ],
-  "projects": [
-    {
-      "name": "str",
-      "technologies": ["str"],
-      "description": "str"
-    }
-  ],
-  "certifications": ["str"],
-  "gaps": [
-    {
-      "name": "str (skill gap name)",
-      "category": "str (e.g. Cloud, DevOps, API Design, Testing)",
-      "impact": <integer between 5 and 15>,
-      "checked": false
-    }
-  ]
-}
-
-For the 'gaps' array: identify the top 4 most impactful skill gaps based on what is missing or weak compared to modern industry standards for the candidate's apparent role level. Each gap must have a unique name, a category, and an impact integer between 5 and 15 (higher = more critical).
-Return ONLY the raw JSON output without any markdown formatting or surrounding text.
-"""
-        try:
-            raw_full_response = await call_llama(
-                system_prompt=FULL_PARSE_PROMPT,
-                user_content=raw_text[:6000],
-            )
-            parsed_data_json = extract_json(raw_full_response)
-            # Attach skills for quality scoring (use technical_skills as full inventory)
-            parsed_data_json["skills"] = resume_technical_skills
-            # Write clean parsed output for debugging
-            parsed = extract_json(raw_full_response)
             with open("resume_full_parse.json", "w", encoding="utf-8") as f:
-                json.dump(parsed, f, indent=4)
+                import json
+                json.dump(parsed_data_json, f, indent=4)
+            logger.info("Groq extracted comprehensive structured profile with normalization.")
         except Exception as e:
-            logger.error(f"Groq full parse failed: {e}. Using text-scan fallback.")
-            parsed_data_json = generate_mock_resume_data(raw_text)
-            parsed_data_json["skills"] = resume_technical_skills if resume_technical_skills else parsed_data_json.get("skills", [])
+            logger.error(f"Groq comprehensive parse failed: {e}. Using text-scan fallback.")
+            raw_parsed = generate_mock_resume_data(raw_text)
+            parsed_data_json: dict[str, Any] = {
+                "raw": raw_parsed,
+                "normalized": {
+                    "technical_skills": raw_parsed.get("skills", []),
+                    "soft_skills": [],
+                    "keywords": [],
+                    "certifications": [],
+                    "project_domains": [],
+                    "education_degrees": [],
+                    "education_fields": [],
+                    "job_titles": [],
+                    "experience_domains": []
+                }
+            }
+            resume_technical_skills = parsed_data_json["normalized"]["technical_skills"]
+            resume_representative_skills = resume_technical_skills[:10]
+
+        # ── Compatibility Mapping for Frontend & Legacy Functions ──
+        # Inject standard fallback keys into the ROOT of parsed_data_json so calculate_resume_quality_score doesn't break
+        raw_exp = parsed_data_json["raw"].get("experience", {})
+        if isinstance(raw_exp, dict):
+            mapped_experience = []
+            for role in raw_exp.get("roles", []):
+                if isinstance(role, dict):
+                    mapped_experience.append({
+                        "company": role.get("company", ""),
+                        "role": role.get("designation", ""),
+                        "duration": role.get("duration", ""),
+                        "details": role.get("description", "")
+                    })
+            parsed_data_json["experience"] = mapped_experience
+        elif isinstance(raw_exp, list):
+            parsed_data_json["experience"] = raw_exp
+        else:
+            parsed_data_json["experience"] = []
+
+        parsed_data_json["gaps"] = []
+        
+        parsed_data_json["name"] = parsed_data_json["raw"].get("candidate_name", "Unknown Candidate")
+        
+        emails = parsed_data_json["raw"].get("email", "")
+        phones = parsed_data_json["raw"].get("phone", "")
+        linkedin = parsed_data_json["raw"].get("linkedin", "")
+        parsed_data_json["contact_info"] = ", ".join(filter(None, [emails, phones, linkedin]))
+
+        parsed_data_json["skills"] = resume_technical_skills
 
     # 3. Calculate deterministic Resume Quality Score
     # Use technical_skills for quality scoring (complete inventory)
-    resume_quality_score = calculate_resume_quality_score(parsed_data_json)
+    resume_quality_score = int(calculate_resume_quality_v2(parsed_data_json))
     logger.info(f"RESUME_QUALITY_SCORE: {resume_quality_score}")
     print(f"\nRESUME_QUALITY_SCORE: {resume_quality_score}")
     print(f"TECHNICAL_SKILLS_COUNT: {len(resume_technical_skills)}")

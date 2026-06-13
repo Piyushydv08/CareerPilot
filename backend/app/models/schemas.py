@@ -65,6 +65,17 @@ class MatchAnalysisResponse(BaseModel):
     matched_skills: List[str] = Field(default_factory=list)   # jd_skills ∩ resume_skills
     missing_skills: List[str] = Field(default_factory=list)   # jd_skills − resume_skills
     gap_skills: List[str] = Field(default_factory=list)       # Alias of missing_skills (backward compat)
+    parsed_resume: Dict[str, Any] = Field(default_factory=dict)
+    parsed_jd: Dict[str, Any] = Field(default_factory=dict)
+
+class SimulateScoreRequest(BaseModel):
+    parsed_resume: Dict[str, Any]
+    parsed_jd: Dict[str, Any]
+    simulated_technical_skills: List[str]
+
+class SimulateScoreResponse(BaseModel):
+    match_score: int
+    category_scores: ATSCategoryScores
 
 # --- Interview Models ---
 class InterviewStartRequest(BaseModel):

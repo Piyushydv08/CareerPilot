@@ -18,10 +18,10 @@ class Settings(BaseSettings):
     MONGODB_URL: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "careerpilot"
     
-    # CORS Origin Configurations (Safely maps http://localhost:3000 strings)
+    # CORS Origin Configurations
     CORS_ORIGINS: Annotated[
         List[str], BeforeValidator(parse_cors_origins)
-    ] = ["http://localhost:3000"]
+    ] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"]
     
     # App port
     PORT: int = 8000

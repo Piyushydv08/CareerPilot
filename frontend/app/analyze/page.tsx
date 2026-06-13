@@ -225,7 +225,7 @@ function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
           <div className="flex items-center gap-1.5 mb-3">
             <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
             <span className="font-mono text-[10px] uppercase tracking-wider text-amber-400 font-semibold">
-              AI Improvement Suggestions
+              Recommendations
             </span>
           </div>
           <div className="flex flex-col gap-2">

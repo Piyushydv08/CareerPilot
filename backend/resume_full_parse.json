@@ -1,92 +1,194 @@
 {
-    "candidate_name": "Abhineet Mukherjee",
-    "contact_info": "abhineet.mukherjee.ug23@nsut.ac.in, +91-9509429199, https://github.com/mukherjeeprakash17",
-    "experience": [
-        {
-            "company": "DSCL India Limited",
-            "role": "Accounts & Development Intern",
-            "duration": "June 2025 \u2013 July 2025",
-            "details": "Gained exposure to accounting and finance operations, developed an understanding of corporate reporting, financial workflows, and the role of finance. Acquired familiarity with SAP ERP and its application in integrating finance, procurement, and inventory functions."
-        }
-    ],
-    "education": [
-        {
-            "degree": "B.Tech. ICE",
-            "institution": "Netaji Subhas University of Technology",
-            "year": "2023-2027"
+    "raw": {
+        "candidate_name": "Abhineet Mukherjee",
+        "email": "abhineet.mukherjee.ug23@nsut.ac.in",
+        "phone": "+91-9509429199",
+        "location": "",
+        "linkedin": "",
+        "github": "https://github.com/mukherjeeprakash17",
+        "portfolio": "",
+        "summary": "",
+        "technical_skills": [
+            "Python",
+            "Pandas",
+            "NumPy",
+            "Scikit-learn",
+            "Matplotlib",
+            "SQL",
+            "Excel",
+            "Data Visualization",
+            "LangChain",
+            "MS Excel",
+            "PowerPoint",
+            "MYSQL",
+            "Canva",
+            "Spacy",
+            "NLP",
+            "Generative AI",
+            "LLM APIs",
+            "Resume Parsing",
+            "Streamlit",
+            "TMDB API"
+        ],
+        "soft_skills": [
+            "Communication",
+            "Leadership",
+            "Analytical Reasoning",
+            "Teamwork",
+            "Event Coordination",
+            "Adaptability"
+        ],
+        "experience": {
+            "total_years": 0,
+            "roles": [
+                {
+                    "company": "DSCL India Limited",
+                    "designation": "Accounts & Development Intern",
+                    "duration": "June 2025 \u2013 July 2025",
+                    "description": "Gained exposure to accounting and finance operations within a large-scale manufacturing organization, developing an understanding of corporate reporting, financial workflows and the role of finance. Acquired familiarity with SAP ERP and its application in integrating finance, procurement and inventory functions.",
+                    "skills_used": [
+                        "SAP ERP",
+                        "Financial workflows",
+                        "Corporate reporting"
+                    ]
+                }
+            ]
         },
-        {
-            "degree": "Class XII",
-            "institution": "Shiv Jyoti Senior Secondary School, India",
-            "year": "2023"
-        },
-        {
-            "degree": "Class X",
-            "institution": "Saint Pauls School, India",
-            "year": "2021"
-        }
-    ],
-    "projects": [
-        {
-            "name": "ATS Resume Analyzer And Skill Gap Assessment System",
-            "technologies": [
-                "Python",
-                "NLP",
-                "Generative AI",
-                "LLM APIs",
-                "Resume Parsing",
-                "Scikit-learn"
-            ],
-            "description": "Developed an AI-powered Resume Analyzer using NLP and resume parsing techniques to extract candidate education, experience, projects, and skills from resumes. Designed an ATS-style scoring framework and integrated LLMs to identify skill gaps and generate personalized feedback."
-        },
-        {
-            "name": "Movie Recommender System (Netflix)",
-            "technologies": [
-                "Python",
-                "Pandas",
-                "NumPy",
-                "Scikit-learn",
-                "Streamlit",
-                "TMDB API"
-            ],
-            "description": "Built a content-based recommendation engine using the TMDB 5000 Movie Dataset, transforming raw movie data into actionable insights to improve content discovery and user engagement."
-        },
-        {
-            "name": "Autonomous Drone System \u2013 Tata Elxsi Teliport Challenge",
-            "technologies": [
-                "IMU",
-                "GNSS",
-                "Vision",
-                "UWB"
-            ],
-            "description": "Designed a high-level system architecture enabling autonomous takeoff and landing on a moving platform, addressing challenges related to navigation, stability, and operational safety."
-        }
-    ],
-    "certifications": [],
-    "gaps": [
-        {
-            "name": "Cloud Computing Skills",
-            "category": "Cloud",
-            "impact": 12,
-            "checked": false
-        },
-        {
-            "name": "DevOps Experience",
-            "category": "DevOps",
-            "impact": 10,
-            "checked": false
-        },
-        {
-            "name": "API Design Knowledge",
-            "category": "API Design",
-            "impact": 8,
-            "checked": false
-        },
-        {
-            "name": "Advanced Testing Skills",
-            "category": "Testing",
-            "impact": 9,
-            "checked": false
-        }
-    ]
+        "education": [
+            {
+                "degree": "Bachelor of Technology",
+                "field_of_study": "Instrumentation And Control Engineering",
+                "institution": "Netaji Subhas University of Technology",
+                "year": "2023-2027"
+            },
+            {
+                "degree": "Class XII",
+                "field_of_study": "",
+                "institution": "Shiv Jyoti Senior Secondary School",
+                "year": "2023"
+            },
+            {
+                "degree": "Class X",
+                "field_of_study": "",
+                "institution": "Saint Pauls School",
+                "year": "2021"
+            }
+        ],
+        "certifications": [],
+        "projects": [
+            {
+                "project_name": "ATS Resume Analyzer And Skill Gap Assessment System",
+                "description": "Developed an AI-powered Resume Analyzer using NLP and resume parsing techniques to extract candidate education, experience, projects and skills from resumes.",
+                "technologies": [
+                    "Python",
+                    "NLP",
+                    "Generative AI",
+                    "LLM APIs",
+                    "Resume Parsing",
+                    "Scikit-learn"
+                ],
+                "domain": "Data Analytics"
+            },
+            {
+                "project_name": "Movie Recommender System (Netflix)",
+                "description": "Built a content-based recommendation engine using the TMDB 5000 Movie Dataset, transforming raw movie data into actionable insights to improve content discovery and user engagement.",
+                "technologies": [
+                    "Python",
+                    "Pandas",
+                    "NumPy",
+                    "Scikit-learn",
+                    "Streamlit",
+                    "TMDB API"
+                ],
+                "domain": "Machine Learning"
+            },
+            {
+                "project_name": "Autonomous Drone System \u2013 Tata Elxsi Teliport Challenge",
+                "description": "Ranked among the top 3,000 teams out of 47,000+ registrations by designing a high-level system architecture enabling autonomous takeoff and landing on a moving platform.",
+                "technologies": [
+                    "IMU",
+                    "GNSS",
+                    "Vision",
+                    "UWB"
+                ],
+                "domain": "Autonomous Systems"
+            }
+        ],
+        "achievements": [
+            "Ranked among the top 3,000 teams out of 47,000+ registrations in the Tata Elxsi Teliport Challenge"
+        ],
+        "keywords": [
+            "Python",
+            "NLP",
+            "Generative AI",
+            "LLM APIs",
+            "Resume Parsing",
+            "Scikit-learn",
+            "Data Visualization",
+            "Machine Learning",
+            "Autonomous Systems"
+        ]
+    },
+    "normalized": {
+        "technical_skills": [
+            "Python",
+            "Pandas",
+            "NumPy",
+            "Scikit-learn",
+            "Matplotlib",
+            "SQL",
+            "Excel",
+            "Data Visualization",
+            "LangChain",
+            "MS Excel",
+            "PowerPoint",
+            "MySQL",
+            "Canva",
+            "Spacy",
+            "Natural Language Processing",
+            "Generative AI",
+            "LLM APIs",
+            "Resume Parsing",
+            "Streamlit",
+            "TMDB API"
+        ],
+        "soft_skills": [
+            "Communication",
+            "Leadership",
+            "Analytical Reasoning",
+            "Teamwork",
+            "Event Coordination",
+            "Adaptability"
+        ],
+        "keywords": [
+            "Python",
+            "Natural Language Processing",
+            "Generative Ai",
+            "Llm Apis",
+            "Resume Parsing",
+            "Scikit-Learn",
+            "Data Visualization",
+            "Machine Learning",
+            "Autonomous Systems"
+        ],
+        "certifications": [],
+        "project_domains": [
+            "Data Analytics",
+            "Machine Learning",
+            "Autonomous Systems"
+        ],
+        "education_degrees": [
+            "Bachelor of Technology",
+            "Class Xii",
+            "Class X"
+        ],
+        "education_fields": [
+            "Instrumentation And Control Engineering",
+            ""
+        ],
+        "job_titles": [
+            "Accounts & Development Intern"
+        ],
+        "experience_domains": []
+    }
 }
