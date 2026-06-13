@@ -8,15 +8,16 @@ TECHNICAL_SKILL_MAP = {
     "react": "React", "reactjs": "React", "react.js": "React", "react js": "React",
     "javascript": "JavaScript", "js": "JavaScript", "java script": "JavaScript",
     "typescript": "TypeScript", "ts": "TypeScript", "type script": "TypeScript",
-    "aws": "AWS", "amazon web services": "AWS", "aws ec2": "AWS",
+    "aws": "AWS", "amazon web services": "AWS", "aws ec2": "AWS", "aws cloud": "AWS",
     "gcp": "GCP", "google cloud": "GCP", "google cloud platform": "GCP",
     "kubernetes": "Kubernetes", "k8s": "Kubernetes",
     "mongodb": "MongoDB", "mongo": "MongoDB",
     "postgresql": "PostgreSQL", "postgres": "PostgreSQL",
     "powerbi": "Power BI", "power bi": "Power BI",
-    "ml": "Machine Learning", "machine learning": "Machine Learning",
-    "ai": "Artificial Intelligence", "artificial intelligence": "Artificial Intelligence",
-    "nlp": "Natural Language Processing", "natural language processing": "Natural Language Processing",
+    "ml": "Machine Learning", "machine learning": "Machine Learning", "machine learning (ml)": "Machine Learning",
+    "dl": "Deep Learning", "deep learning": "Deep Learning", "deep learning (dl)": "Deep Learning",
+    "ai": "Artificial Intelligence", "artificial intelligence": "Artificial Intelligence", "artificial intelligence (ai)": "Artificial Intelligence",
+    "nlp": "Natural Language Processing", "natural language processing": "Natural Language Processing", "natural language processing (nlp)": "Natural Language Processing",
     "mysql": "MySQL", "redis": "Redis", "git": "Git",
     "vue": "Vue.js", "vue.js": "Vue.js", "vuejs": "Vue.js",
     "angular": "Angular",
@@ -46,7 +47,7 @@ SOFT_SKILL_MAP = {
 }
 
 EDUCATION_DEGREE_MAP = {
-    "b.tech": "Bachelor of Technology", "bachelors of technology": "Bachelor of Technology", "bachelor in technology": "Bachelor of Technology", "bachelor's degree in technology": "Bachelor of Technology", "bachelor of technology": "Bachelor of Technology",
+    "b.tech": "Bachelor of Technology", "bachelors of technology": "Bachelor of Technology", "bachelor in technology": "Bachelor of Technology", "bachelor's in technology": "Bachelor of Technology", "bachelor's degree in technology": "Bachelor of Technology", "bachelor of technology": "Bachelor of Technology",
     "b.e.": "Bachelor of Engineering", "bachelor of engineering": "Bachelor of Engineering",
     "b.sc": "Bachelor of Science", "bachelor of science": "Bachelor of Science",
     "m.tech": "Master of Technology", "masters of technology": "Master of Technology", "master in technology": "Master of Technology", "master of technology": "Master of Technology",
@@ -66,7 +67,7 @@ EDUCATION_FIELD_MAP = {
 
 CERTIFICATION_MAP = {
     "aws cloud practitioner": "AWS Certified Cloud Practitioner", "aws certified cloud practitioner": "AWS Certified Cloud Practitioner",
-    "google data analytics cert": "Google Data Analytics Professional Certificate", "google data analytics professional certificate": "Google Data Analytics Professional Certificate",
+    "google data analytics cert": "Google Data Analytics Professional Certificate", "google data analytics certificate": "Google Data Analytics Professional Certificate", "google data analytics professional certificate": "Google Data Analytics Professional Certificate",
     "microsoft power bi cert": "Microsoft Power BI Certification", "microsoft power bi certification": "Microsoft Power BI Certification",
 }
 

@@ -1,68 +1,32 @@
 {
     "raw": {
-        "job_title": "AI / ML Engineer",
-        "department": "",
-        "seniority_level": "",
+        "job_title": "Business Analyst Intern",
+        "department": "Retail Analytics, Data & AI",
+        "seniority_level": "Intern",
         "technical_skills": [
-            "Machine Learning (ML)",
-            "Deep Learning",
-            "Neural Networks",
-            "Natural Language Processing (NLP)",
-            "Cloud AI services",
-            "Python",
-            "TensorFlow",
-            "PyTorch",
-            "Keras",
-            "SpaCy",
-            "NLTK",
-            "Hugging Face",
-            "Matplotlib",
-            "Seaborn",
-            "Plotly",
-            "Data Structures",
-            "Algorithms",
-            "Software Engineering",
-            "Agile",
-            "Scrum",
-            "GenAI models",
-            "GANs",
-            "VAE",
-            "GPT",
-            "AWS",
-            "Azure",
-            "GCP"
+            "SQL",
+            "AI tools"
         ],
         "soft_skills": [
-            "Problem-solving",
-            "Analytical skills",
+            "Analytical thinking",
+            "Business acumen",
+            "Problem-solving ability",
+            "Presentation skills",
             "Communication skills",
-            "Critical thinking",
-            "Creativity",
-            "Proactive mindset",
-            "Teamwork",
-            "Collaboration",
-            "Adaptability",
-            "Time Management",
-            "Leadership"
+            "Structured thinking",
+            "Attention to detail"
         ],
         "experience_requirements": {
-            "minimum_years": 5,
+            "minimum_years": 0,
             "maximum_years": 0,
-            "required_domains": [
-                "Machine Learning",
-                "Artificial Intelligence"
-            ],
+            "required_domains": [],
             "preferred_domains": []
         },
         "education_requirements": {
             "required_degrees": [
-                "Computer Science",
-                "Artificial Intelligence",
-                "Machine Learning"
+                "B.Tech"
             ],
-            "preferred_degrees": [
-                "Ph.D"
-            ],
+            "preferred_degrees": [],
             "required_fields_of_study": [],
             "preferred_fields_of_study": []
         },
@@ -71,68 +35,45 @@
             "preferred_certifications": []
         },
         "project_requirements": [
-            "Generative AI models",
-            "Deep learning",
-            "Neural networks",
-            "Chatbots",
-            "Image processing"
+            "Retail analytics projects",
+            "Business intelligence projects",
+            "AI projects"
         ],
         "responsibilities": [
-            "Implementing generative AI models",
-            "Conducting research",
-            "Optimizing existing generative AI models",
-            "Ensuring data quality and accuracy",
-            "Leading the design and development of prompt engineering strategies",
-            "Implementing cutting-edge NLP techniques",
-            "Determining the most effective prompt generation processes",
-            "Developing clear and concise documentation"
+            "Analyze business problems",
+            "Extract, clean, and analyze data",
+            "Leverage AI tools for analysis",
+            "Identify trends and insights",
+            "Prepare reports and presentations",
+            "Conduct market and competitor research"
         ],
         "preferred_skills": [],
-        "keywords": []
+        "keywords": [
+            "Retail analytics",
+            "Data",
+            "AI",
+            "Business intelligence"
+        ]
     },
     "normalized": {
         "technical_skills": [
-            "Machine Learning (ML)",
-            "Deep Learning",
-            "Neural Networks",
-            "Natural Language Processing (NLP)",
-            "Cloud AI services",
-            "Python",
-            "TensorFlow",
-            "PyTorch",
-            "Keras",
-            "SpaCy",
-            "NLTK",
-            "Hugging Face",
-            "Matplotlib",
-            "Seaborn",
-            "Plotly",
-            "Data Structures",
-            "Algorithms",
-            "Software Engineering",
-            "Agile",
-            "Scrum",
-            "GenAI models",
-            "GANs",
-            "VAE",
-            "GPT",
-            "AWS",
-            "Azure",
-            "GCP"
+            "SQL",
+            "AI tools"
         ],
         "soft_skills": [
-            "Problem-Solving",
             "Analytical Thinking",
+            "Business Acumen",
+            "Problem-Solving Ability",
+            "Presentation Skills",
             "Communication",
-            "Critical Thinking",
-            "Creativity",
-            "Proactive Mindset",
-            "Teamwork",
-            "Collaboration",
-            "Adaptability",
-            "Time Management",
-            "Leadership"
+            "Structured Thinking",
+            "Attention To Detail"
         ],
-        "keywords": []
+        "keywords": [
+            "Retail Analytics",
+            "Data",
+            "Artificial Intelligence",
+            "Business Intelligence"
+        ]
     }
 }
