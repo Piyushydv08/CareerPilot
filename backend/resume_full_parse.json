@@ -111,7 +111,7 @@
                     "Vision",
                     "UWB"
                 ],
-                "domain": "Autonomous Systems"
+                "domain": "Machine Learning And Artifical Intelligence"
             }
         ],
         "achievements": [
@@ -119,14 +119,16 @@
         ],
         "keywords": [
             "Python",
+            "Machine Learning",
+            "Data Analysis",
+            "SQL",
             "NLP",
             "Generative AI",
             "LLM APIs",
             "Resume Parsing",
             "Scikit-learn",
-            "Data Visualization",
-            "Machine Learning",
-            "Autonomous Systems"
+            "Streamlit",
+            "TMDB API"
         ]
     },
     "normalized": {
@@ -162,20 +164,22 @@
         ],
         "keywords": [
             "Python",
+            "Machine Learning",
+            "Data Analysis",
+            "Sql",
             "Natural Language Processing",
             "Generative Ai",
             "Llm Apis",
             "Resume Parsing",
             "Scikit-Learn",
-            "Data Visualization",
-            "Machine Learning",
-            "Autonomous Systems"
+            "Streamlit",
+            "Tmdb Api"
         ],
         "certifications": [],
         "project_domains": [
             "Data Analytics",
             "Machine Learning",
-            "Autonomous Systems"
+            "Machine Learning And Artifical Intelligence"
         ],
         "education_degrees": [
             "Bachelor of Technology",

@@ -94,12 +94,15 @@ JOB_TITLE_MAP = {
 def normalize_string(val: str, mapping: dict) -> str:
     if not isinstance(val, str):
         return str(val)
+    # Clean whitespace: strip and replace multiple spaces with single space
+    clean_val = " ".join(val.strip().split())
     # Return canonical mapped value or title case if not found
-    return mapping.get(val.lower().strip(), val.strip().title())
+    return mapping.get(clean_val.lower(), clean_val.title())
 
 def normalize_technical_skill(skill: str) -> str:
     if not isinstance(skill, str): return skill
-    return TECHNICAL_SKILL_MAP.get(skill.lower().strip(), skill.strip())
+    clean_skill = " ".join(skill.strip().split())
+    return TECHNICAL_SKILL_MAP.get(clean_skill.lower(), clean_skill)
 
 def normalize_soft_skill(skill: str) -> str:
     return normalize_string(skill, SOFT_SKILL_MAP)

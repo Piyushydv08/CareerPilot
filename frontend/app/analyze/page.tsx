@@ -597,11 +597,23 @@ export default function AnalyzePage() {
                       <span>Identified Strengths</span>
                     </span>
                     <div className="flex flex-wrap gap-2 mt-3.5">
-                      {resumeData.skills.filter(s => s.match >= 70).map(skill => (
-                        <span key={skill.name} className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase tracking-wider rounded">
-                          {skill.name}
-                        </span>
-                      ))}
+                      {atsMatchDetail ? (
+                        atsMatchDetail.matched_keywords.length > 0 ? (
+                           atsMatchDetail.matched_keywords.map(skill => (
+                             <span key={skill} className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-[#00d2ff] uppercase tracking-wider rounded">
+                               {skill}
+                             </span>
+                           ))
+                        ) : (
+                           <span className="text-[10px] text-on-surface-variant italic font-mono">No matching skills found in JD.</span>
+                        )
+                      ) : (
+                        resumeData.skills.filter(s => s.match >= 70).map(skill => (
+                          <span key={skill.name} className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue uppercase tracking-wider rounded">
+                            {skill.name}
+                          </span>
+                        ))
+                      )}
                     </div>
                   </div>
                   <div className="text-left">

@@ -533,7 +533,6 @@ async def analyze_match_score(
     raw_resume_skills: list[str] = []
     raw_resume_soft_skills: list[str] = []
     
-    # Check if we have the new nested normalized schema
     if "normalized" in resume_data_parsed and isinstance(resume_data_parsed["normalized"], dict):
         raw_resume_skills = resume_data_parsed["normalized"].get("technical_skills", [])
         raw_resume_soft_skills = resume_data_parsed["normalized"].get("soft_skills", [])
@@ -541,15 +540,24 @@ async def analyze_match_score(
         parsed_tech = resume_data_parsed.get("technical_skills", [])
         if isinstance(parsed_tech, list) and parsed_tech:
             raw_resume_skills = [s for s in parsed_tech if isinstance(s, str)]
-        elif payload.resume and payload.resume.skills:
-            raw_resume_skills = [s.name for s in payload.resume.skills]
             
         parsed_soft = resume_data_parsed.get("soft_skills", [])
         if isinstance(parsed_soft, list) and parsed_soft:
             raw_resume_soft_skills = [s for s in parsed_soft if isinstance(s, str)]
+
+    # ALWAYS merge the skills from the initial resume parse payload to ensure no skills are dropped during re-parse
+    if payload.resume and payload.resume.skills:
+        payload_skills = [s.name for s in payload.resume.skills if s.name]
+        raw_resume_skills.extend(payload_skills)
             
     resume_skills = deduplicate_normalized_list([normalize_technical_skill(s) for s in raw_resume_skills])
     resume_soft_skills = deduplicate_normalized_list([normalize_soft_skill(s) for s in raw_resume_soft_skills])
+
+    # Inject normalized skills back into resume_data_parsed so the mathematical ATS formula sees everything
+    if "normalized" not in resume_data_parsed or not isinstance(resume_data_parsed["normalized"], dict):
+        resume_data_parsed["normalized"] = {}
+    resume_data_parsed["normalized"]["technical_skills"] = resume_skills
+    resume_data_parsed["normalized"]["soft_skills"] = resume_soft_skills
 
     # ── Set-difference gap computation ───────────────────────────────────────
     resume_set = {s.lower() for s in resume_skills}
@@ -661,10 +669,15 @@ async def simulate_score(payload: SimulateScoreRequest):
     simulated_resume = copy.deepcopy(payload.parsed_resume)
     
     # Inject simulated skills into the normalized technical skills array
-    if "normalized" not in simulated_resume:
+    if "normalized" not in simulated_resume or not isinstance(simulated_resume["normalized"], dict):
         simulated_resume["normalized"] = {}
     
     existing_tech = simulated_resume["normalized"].get("technical_skills", [])
+    if not existing_tech:
+        existing_tech = simulated_resume.get("technical_skills", [])
+        if not existing_tech:
+            existing_tech = simulated_resume.get("raw", {}).get("technical_skills", [])
+
     simulated_resume["normalized"]["technical_skills"] = existing_tech + payload.simulated_technical_skills
     
     # Run the exact mathematical engine

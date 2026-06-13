@@ -1037,8 +1037,21 @@ Keep points concise. No markdown or explanations.
     tech_skills_clean = [s["name"] if isinstance(s, dict) else str(s) for s in resume_technical_skills]
     soft_skills_clean = [s["name"] if isinstance(s, dict) else str(s) for s in resume_soft_skills]
 
+    # Robust name extraction fallback
+    candidate_name = parsed_data_json.get("name") or parsed_data_json.get("candidate_name") or ""
+    if isinstance(candidate_name, str):
+        candidate_name = candidate_name.strip()
+    if not candidate_name or candidate_name == "Unknown Candidate":
+        for line in raw_text.split('\n'):
+            cleaned_line = line.strip()
+            if cleaned_line and len(cleaned_line) < 60 and '@' not in cleaned_line and not re.search(r'\d', cleaned_line):
+                candidate_name = cleaned_line
+                break
+    if not candidate_name:
+        candidate_name = "Unknown Candidate"
+
     parsed_data = {
-        "name": parsed_data_json.get("candidate_name", "Unknown Candidate"),
+        "name": candidate_name,
         "email": parsed_data_json.get("contact_info", "No Contact Info Found"),
         "skills": flattened_skills,
         "technical_skills": tech_skills_clean,

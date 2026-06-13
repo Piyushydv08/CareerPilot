@@ -1,32 +1,68 @@
 {
     "raw": {
-        "job_title": "Business Analyst Intern",
-        "department": "Retail Analytics, Data & AI",
-        "seniority_level": "Intern",
+        "job_title": "AI / ML Engineer",
+        "department": "",
+        "seniority_level": "",
         "technical_skills": [
-            "SQL",
-            "AI tools"
+            "Machine Learning (ML)",
+            "Deep Learning",
+            "Neural Networks",
+            "Natural Language Processing (NLP)",
+            "Cloud AI services",
+            "Python",
+            "TensorFlow",
+            "PyTorch",
+            "Keras",
+            "SpaCy",
+            "NLTK",
+            "Hugging Face",
+            "Matplotlib",
+            "Seaborn",
+            "Plotly",
+            "Data Structures",
+            "Algorithms",
+            "Software Engineering",
+            "Agile",
+            "Scrum",
+            "GenAI models",
+            "GANs",
+            "VAE",
+            "GPT",
+            "AWS",
+            "Azure",
+            "GCP"
         ],
         "soft_skills": [
-            "Analytical thinking",
-            "Business acumen",
-            "Problem-solving ability",
-            "Presentation skills",
+            "Problem-solving",
+            "Analytical skills",
             "Communication skills",
-            "Structured thinking",
-            "Attention to detail"
+            "Critical thinking",
+            "Creativity",
+            "Proactive mindset",
+            "Teamwork",
+            "Collaboration",
+            "Adaptability",
+            "Time Management",
+            "Leadership"
         ],
         "experience_requirements": {
-            "minimum_years": 0,
+            "minimum_years": 5,
             "maximum_years": 0,
-            "required_domains": [],
+            "required_domains": [
+                "Machine Learning",
+                "Artificial Intelligence"
+            ],
             "preferred_domains": []
         },
         "education_requirements": {
             "required_degrees": [
-                "B.Tech"
+                "Computer Science",
+                "Artificial Intelligence",
+                "Machine Learning"
             ],
-            "preferred_degrees": [],
+            "preferred_degrees": [
+                "Ph.D"
+            ],
             "required_fields_of_study": [],
             "preferred_fields_of_study": []
         },
@@ -35,45 +71,68 @@
             "preferred_certifications": []
         },
         "project_requirements": [
-            "Retail analytics projects",
-            "Business intelligence projects",
-            "AI projects"
+            "Generative AI models",
+            "Deep learning",
+            "Neural networks",
+            "Chatbots",
+            "Image processing"
         ],
         "responsibilities": [
-            "Analyze business problems",
-            "Extract, clean, and analyze data",
-            "Leverage AI tools for analysis",
-            "Identify trends and insights",
-            "Prepare reports and presentations",
-            "Conduct market and competitor research"
+            "Implementing generative AI models",
+            "Conducting research",
+            "Optimizing existing generative AI models",
+            "Ensuring data quality and accuracy",
+            "Leading the design and development of prompt engineering strategies",
+            "Implementing cutting-edge NLP techniques",
+            "Determining the most effective prompt generation processes",
+            "Developing clear and concise documentation"
         ],
         "preferred_skills": [],
-        "keywords": [
-            "Retail analytics",
-            "Data",
-            "AI",
-            "Business intelligence"
-        ]
+        "keywords": []
     },
     "normalized": {
         "technical_skills": [
-            "SQL",
-            "AI tools"
+            "Machine Learning (ML)",
+            "Deep Learning",
+            "Neural Networks",
+            "Natural Language Processing (NLP)",
+            "Cloud AI services",
+            "Python",
+            "TensorFlow",
+            "PyTorch",
+            "Keras",
+            "SpaCy",
+            "NLTK",
+            "Hugging Face",
+            "Matplotlib",
+            "Seaborn",
+            "Plotly",
+            "Data Structures",
+            "Algorithms",
+            "Software Engineering",
+            "Agile",
+            "Scrum",
+            "GenAI models",
+            "GANs",
+            "VAE",
+            "GPT",
+            "AWS",
+            "Azure",
+            "GCP"
         ],
         "soft_skills": [
+            "Problem-Solving",
             "Analytical Thinking",
-            "Business Acumen",
-            "Problem-Solving Ability",
-            "Presentation Skills",
             "Communication",
-            "Structured Thinking",
-            "Attention To Detail"
+            "Critical Thinking",
+            "Creativity",
+            "Proactive Mindset",
+            "Teamwork",
+            "Collaboration",
+            "Adaptability",
+            "Time Management",
+            "Leadership"
         ],
-        "keywords": [
-            "Retail Analytics",
-            "Data",
-            "Artificial Intelligence",
-            "Business Intelligence"
-        ]
+        "keywords": []
     }
 }
