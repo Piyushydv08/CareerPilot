@@ -1,162 +1,197 @@
 {
     "raw": {
-        "candidate_name": "ELLA WHITE",
-        "email": "",
-        "phone": "+1-(234)-555-1234",
-        "location": "San Jose, California",
-        "linkedin": "linkedin.com",
-        "github": "GitHub",
+        "candidate_name": "Abhineet Mukherjee",
+        "email": "abhineet.mukherjee.ug23@nsut.ac.in",
+        "phone": "+91-9509429199",
+        "location": "",
+        "linkedin": "",
+        "github": "https://github.com/mukherjeeprakash17",
         "portfolio": "",
-        "summary": "Passionate machine learning engineer with over 5 years of experience in developing and optimizing scalable models using Python and TensorFlow. Demonstrated success in improving client operations by 30% through data-driven insights and cross-functional collaboration. Achieved a 20% increase in user engagement, reflecting a commitment to impactful, innovative machine learning solutions.",
+        "summary": "",
         "technical_skills": [
             "Python",
-            "TensorFlow",
-            "scikit-learn",
-            "Machine Learning",
-            "Data Analysis",
-            "Statistical Analysis",
-            "Data Manipulation",
-            "Ensemble Techniques",
+            "Pandas",
+            "NumPy",
+            "Scikit-learn",
+            "Matplotlib",
+            "SQL",
+            "Excel",
+            "Data Visualization",
+            "LangChain",
+            "MS Excel",
+            "PowerPoint",
+            "MYSQL",
+            "Canva",
+            "Spacy",
             "NLP",
-            "Semantic Analysis"
+            "Generative AI",
+            "LLM APIs",
+            "Resume Parsing",
+            "Streamlit",
+            "TMDB API"
         ],
         "soft_skills": [
             "Communication",
-            "Collaboration",
             "Leadership",
-            "Mentorship",
-            "Problem Solving",
-            "Teamwork"
+            "Analytical Reasoning",
+            "Teamwork",
+            "Event Coordination",
+            "Adaptability"
         ],
         "experience": {
-            "total_years": 5,
+            "total_years": 0,
             "roles": [
                 {
-                    "company": "Insight Data Solutions",
-                    "designation": "Machine Learning Engineer",
-                    "duration": "01/2024 - Present",
-                    "description": "Develop and deploy machine learning models that increased client revenue by 15% within 12 months using TensorFlow and scikit-learn. Collaborate with data scientists and engineers to integrate models into client systems, improving workflow efficiency by 30%. Conduct comprehensive data analysis and feature engineering, enhancing model accuracy by 22% through refined data processes.",
+                    "company": "DSCL India Limited",
+                    "designation": "Accounts & Development Intern",
+                    "duration": "June 2025 \u2013 July 2025",
+                    "description": "Gained exposure to accounting and finance operations within a large-scale manufacturing organization, developing an understanding of corporate reporting, financial workflows and the role of finance. Acquired familiarity with SAP ERP and its application in integrating finance, procurement and inventory functions.",
                     "skills_used": [
-                        "TensorFlow",
-                        "scikit-learn",
-                        "Machine Learning",
-                        "Data Analysis",
-                        "Feature Engineering"
-                    ]
-                },
-                {
-                    "company": "Cortex Analytics",
-                    "designation": "Data Scientist",
-                    "duration": "06/2022 - 12/2023",
-                    "description": "Optimized machine learning models, reducing computation time by 40% while maintaining model performance using ensemble techniques. Led A/B testing initiatives that validated model improvements, resulting in a 20% increase in user engagement for client products.",
-                    "skills_used": [
-                        "Machine Learning",
-                        "Ensemble Techniques",
-                        "A/B Testing"
-                    ]
-                },
-                {
-                    "company": "TechNova Systems",
-                    "designation": "AI Specialist",
-                    "duration": "02/2021 - 06/2022",
-                    "description": "Designed AI algorithms that improved predictive capabilities by 18%, enhancing client data processing capacities. Implemented solutions using Python, leading to a 25% reduction in processing errors and improved reliability of client insights.",
-                    "skills_used": [
-                        "AI",
-                        "Python",
-                        "Algorithm Design"
+                        "SAP ERP",
+                        "Financial Modeling",
+                        "Problem Solving"
                     ]
                 }
             ]
         },
         "education": [
             {
-                "degree": "Bachelor of Science in Computer Science",
-                "field_of_study": "Computer Science",
-                "institution": "Stanford University",
-                "year": "01/2017 - 01/2021"
+                "degree": "Bachelor of Technology",
+                "field_of_study": "Instrumentation And Control Engineering",
+                "institution": "Netaji Subhas University of Technology",
+                "year": "2023-2027"
+            },
+            {
+                "degree": "Class XII",
+                "field_of_study": "",
+                "institution": "Shiv Jyoti Senior Secondary School",
+                "year": "2023"
+            },
+            {
+                "degree": "Class X",
+                "field_of_study": "",
+                "institution": "Saint Pauls School",
+                "year": "2021"
             }
         ],
         "certifications": [],
         "projects": [
             {
-                "project_name": "Open Source Predictive Model",
-                "description": "Developed a predictive analytics model for healthcare data to enhance patient outcomes.",
+                "project_name": "ATS Resume Analyzer And Skill Gap Assessment System",
+                "description": "Developed an AI-powered Resume Analyzer using NLP and resume parsing techniques to extract candidate education, experience, projects and skills from resumes.",
                 "technologies": [
-                    "Machine Learning",
-                    "Predictive Analytics"
+                    "Python",
+                    "NLP",
+                    "Generative AI",
+                    "LLM APIs",
+                    "Resume Parsing",
+                    "Scikit-learn"
                 ],
-                "domain": "Healthcare"
+                "domain": "Data Analytics"
             },
             {
-                "project_name": "Collaborative NLP Toolkit",
-                "description": "Created an open-source NLP toolkit for semantic analysis on social media trends.",
+                "project_name": "Movie Recommender System (Netflix)",
+                "description": "Built a content-based recommendation engine using the TMDB 5000 Movie Dataset, transforming raw movie data into actionable insights to improve content discovery and user engagement.",
                 "technologies": [
-                    "NLP",
-                    "Semantic Analysis"
+                    "Python",
+                    "Pandas",
+                    "NumPy",
+                    "Scikit-learn",
+                    "Streamlit",
+                    "TMDB API"
                 ],
-                "domain": "Social Media"
+                "domain": "Machine Learning"
+            },
+            {
+                "project_name": "Autonomous Drone System \u2013 Tata Elxsi Teliport Challenge",
+                "description": "Ranked among the top 3,000 teams out of 47,000+ registrations by designing a high-level system architecture enabling autonomous takeoff and landing on a moving platform.",
+                "technologies": [
+                    "IMU",
+                    "GNSS",
+                    "Vision",
+                    "UWB"
+                ],
+                "domain": "Machine Learning And Artifical Intelligence"
             }
         ],
         "achievements": [
-            "Increased Client Engagement by 20%",
-            "Efficiency Improvement Initiative",
-            "Data-Driven Decision Support"
+            "Ranked among the top 3,000 teams out of 47,000+ registrations in the Tata Elxsi Teliport Challenge"
         ],
         "keywords": [
-            "Machine Learning",
             "Python",
-            "TensorFlow",
+            "Machine Learning",
             "Data Analysis",
-            "AI",
+            "SQL",
             "NLP",
-            "Predictive Analytics"
+            "Generative AI",
+            "LLM APIs",
+            "Resume Parsing",
+            "Scikit-learn",
+            "Streamlit",
+            "TMDB API"
         ]
     },
     "normalized": {
         "technical_skills": [
             "Python",
-            "TensorFlow",
-            "scikit-learn",
-            "Machine Learning",
-            "Data Analysis",
-            "Statistical Analysis",
-            "Data Manipulation",
-            "Ensemble Techniques",
+            "Pandas",
+            "NumPy",
+            "Scikit-learn",
+            "Matplotlib",
+            "SQL",
+            "Excel",
+            "Data Visualization",
+            "LangChain",
+            "MS Excel",
+            "PowerPoint",
+            "MySQL",
+            "Canva",
+            "Spacy",
             "Natural Language Processing",
-            "Semantic Analysis"
+            "Generative AI",
+            "LLM APIs",
+            "Resume Parsing",
+            "Streamlit",
+            "TMDB API"
         ],
         "soft_skills": [
             "Communication",
-            "Collaboration",
             "Leadership",
-            "Mentorship",
-            "Problem Solving",
-            "Teamwork"
+            "Analytical Reasoning",
+            "Teamwork",
+            "Event Coordination",
+            "Adaptability"
         ],
         "keywords": [
-            "Machine Learning",
             "Python",
-            "Tensorflow",
+            "Machine Learning",
             "Data Analysis",
-            "Artificial Intelligence",
+            "Sql",
             "Natural Language Processing",
-            "Predictive Analytics"
+            "Generative Ai",
+            "Llm Apis",
+            "Resume Parsing",
+            "Scikit-Learn",
+            "Streamlit",
+            "Tmdb Api"
         ],
         "certifications": [],
         "project_domains": [
-            "Healthcare",
-            "Social Media"
+            "Data Analytics",
+            "Machine Learning",
+            "Machine Learning And Artifical Intelligence"
         ],
         "education_degrees": [
-            "Bachelor Of Science In Computer Science"
+            "Bachelor of Technology",
+            "Class Xii",
+            "Class X"
         ],
         "education_fields": [
-            "Computer Science"
+            "Instrumentation And Control Engineering",
+            ""
         ],
         "job_titles": [
-            "Machine Learning Engineer",
-            "Data Scientist",
-            "Ai Specialist"
+            "Accounts & Development Intern"
         ],
         "experience_domains": []
     }

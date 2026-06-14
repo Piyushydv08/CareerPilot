@@ -416,7 +416,7 @@ export default function AnalyzePage() {
           Telemetry Analysis <Cpu className="h-6 w-6 text-cyber-blue" />
         </h2>
         <p className="text-sm text-on-surface-variant mt-1 font-mono">
-          Upload your resume and paste a job description — Gemini AI will score your ATS compatibility with a full breakdown.
+          Paste your resume and job description- AI will calculate your determined  ATS score with a full breakdown
         </p>
       </header>
 
@@ -599,13 +599,13 @@ export default function AnalyzePage() {
                     <div className="flex flex-wrap gap-2 mt-3.5">
                       {atsMatchDetail ? (
                         atsMatchDetail.matched_keywords.length > 0 ? (
-                           atsMatchDetail.matched_keywords.map(skill => (
-                             <span key={skill} className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-[#00d2ff] uppercase tracking-wider rounded">
-                               {skill}
-                             </span>
-                           ))
+                          atsMatchDetail.matched_keywords.map(skill => (
+                            <span key={skill} className="px-2.5 py-1 text-[10px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-[#00d2ff] uppercase tracking-wider rounded">
+                              {skill}
+                            </span>
+                          ))
                         ) : (
-                           <span className="text-[10px] text-on-surface-variant italic font-mono">No matching skills found in JD.</span>
+                          <span className="text-[10px] text-on-surface-variant italic font-mono">No matching skills found in JD.</span>
                         )
                       ) : (
                         resumeData.skills.filter(s => s.match >= 70).map(skill => (
