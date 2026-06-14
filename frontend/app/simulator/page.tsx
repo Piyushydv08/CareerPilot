@@ -337,18 +337,22 @@ export default function SimulatorPage() {
                         </p>
                         {milestone.resources.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2">
-                            {milestone.resources.map((resource, rIdx) => (
-                              <a
-                                key={rIdx}
-                                href={resource.startsWith("http") ? resource : undefined}
-                                target={resource.startsWith("http") ? "_blank" : undefined}
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue rounded hover:bg-cyber-blue/10 transition-colors"
-                              >
-                                {resource.startsWith("http") && <ExternalLink className="h-2.5 w-2.5" />}
-                                <span className="truncate max-w-[200px]">{resource.replace(/^https?:\/\//, "")}</span>
-                              </a>
-                            ))}
+                            {milestone.resources.map((resource, rIdx) => {
+                              const isLink = resource.startsWith("http") || resource.startsWith("www.");
+                              const href = resource.startsWith("www.") ? `https://${resource}` : resource;
+                              return (
+                                <a
+                                  key={rIdx}
+                                  href={isLink ? href : undefined}
+                                  target={isLink ? "_blank" : undefined}
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono border border-cyber-blue/20 bg-cyber-blue/5 text-cyber-blue rounded hover:bg-cyber-blue/10 transition-colors"
+                                >
+                                  {isLink && <ExternalLink className="h-2.5 w-2.5" />}
+                                  <span className="truncate max-w-[200px]">{resource.replace(/^https?:\/\//, "")}</span>
+                                </a>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

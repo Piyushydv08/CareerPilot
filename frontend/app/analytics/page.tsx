@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BarChart,
   Bar,
@@ -102,7 +102,10 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AnalyticsData | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "salary" | "companies" | "regional" | "jobs">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "regional" | "jobs">("overview");
+  const [fresherJobs, setFresherJobs] = useState<any[]>([]);
+  const [fresherSkills, setFresherSkills] = useState<any[]>([]);
+  const [loadingFresherJobs, setLoadingFresherJobs] = useState(false);
   
   // Job listing states
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -116,6 +119,30 @@ export default function AnalyticsPage() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [contractTypeFilter, setContractTypeFilter] = useState("");
   const [contractTimeFilter, setContractTimeFilter] = useState("");
+
+  
+  const fetchFresherJobs = async () => {
+    if (fresherJobs.length > 0 || loadingFresherJobs) return;
+    setLoadingFresherJobs(true);
+    try {
+      const response = await fetch(`${BASE_URL}/analytics/top-fresher-jobs`);
+      if (response.ok) {
+        const result = await response.json();
+        setFresherJobs(result.jobs || []);
+        setFresherSkills(result.skills || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch fresher jobs", e);
+    } finally {
+      setLoadingFresherJobs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (data && activeTab === "overview") {
+      fetchFresherJobs();
+    }
+  }, [data, activeTab]);
 
   const currencySymbol = country === "in" ? "₹" : "$";
   const locale = country === "in" ? "en-IN" : "en-US";
@@ -306,8 +333,6 @@ export default function AnalyticsPage() {
         <div className="flex gap-2 border-b border-outline-variant pb-2 mb-6 overflow-x-auto">
           {[
             { id: "overview", label: "Market Overview", icon: BarChart2 },
-            { id: "salary", label: "Salary Analysis", icon: DollarSign },
-            { id: "companies", label: "Top Companies", icon: Building2 },
             { id: "regional", label: "Regional Data", icon: MapPin },
             { id: "jobs", label: "Job Listings", icon: Briefcase }
           ].map(tab => (
@@ -444,134 +469,71 @@ export default function AnalyticsPage() {
 
           {/* Overview Tab Content */}
           {activeTab === "overview" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bento-card rounded-lg p-6">
+            <div className="flex flex-col items-center gap-8 max-w-4xl mx-auto w-full">
+              <div className="bento-card rounded-lg p-6 w-full">
                 <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider mb-6 flex items-center gap-2">
-                  <BarChart2 className="h-4 w-4" />
-                  Skills Demand Index
+                  <Sparkles className="h-4 w-4" />
+                  Top 10 BTech Fresher Jobs (2026)
                 </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={data.skills_demand} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} tickLine={false} />
-                    <YAxis tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} unit="%" />
-                    <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} locale={locale} />} />
-                    <Bar dataKey="percentage" name="Demand %" fill="#00d2ff" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bento-card rounded-lg p-6">
-                <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider mb-6 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Salary by Experience Level
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={data.salaries} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="domain" tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} tickLine={false} />
-                    <YAxis tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} tickFormatter={v => `${currencySymbol}${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip content={<CustomTooltip isSalary currencySymbol={currencySymbol} locale={locale} />} />
-                    <Legend wrapperStyle={{ fontFamily: "monospace", fontSize: "10px" }} />
-                    <Bar dataKey="median" name="Median Salary" fill="#00d2ff" radius={[4, 4, 0, 0]} barSize={40} />
-                    <Bar dataKey="percentile90" name="90th Percentile" fill="#34d399" radius={[4, 4, 0, 0]} barSize={40} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-
-              {data.categories.length > 0 && (
-                <div className="bento-card rounded-lg p-6 lg:col-span-2">
-                  <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider mb-6 flex items-center gap-2">
-                    <Tag className="h-4 w-4" />
-                    Related Categories
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {data.categories.slice(0, 12).map(cat => (
-                      <span key={cat.tag} className="px-3 py-1.5 rounded-full bg-surface-dim/50 text-xs text-on-surface-variant font-mono hover:bg-cyber-blue/20 hover:text-cyber-blue transition-colors cursor-default">
-                        {cat.label}
-                      </span>
+                {loadingFresherJobs ? (
+                  <div className="flex flex-col gap-4 animate-pulse">
+                    {[...Array(4)].map((_, i) => (
+                       <div key={i} className="h-16 bg-surface-container rounded-md w-full"></div>
                     ))}
                   </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Salary Analysis Tab */}
-          {activeTab === "salary" && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bento-card rounded-lg p-6">
-                <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider mb-6 flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Salary Distribution
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={data.salary_histogram} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="range" tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} tickLine={false} angle={-15} textAnchor="end" height={60} />
-                    <YAxis tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} locale={locale} />} />
-                    <Bar dataKey="count" name="Number of Jobs" fill="#00d2ff" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bento-card rounded-lg p-6">
-                <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider mb-6 flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Historical Salary Trends
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={data.historical_salaries} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-                    <defs>
-                      <linearGradient id="salaryGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00d2ff" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#00d2ff" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} tickFormatter={formatMonth} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} tickLine={false} />
-                    <YAxis tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} tickFormatter={v => `${currencySymbol}${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomTooltip isSalary currencySymbol={currencySymbol} locale={locale} />} />
-                    <Area type="monotone" dataKey="salary" name="Avg Salary" stroke="#00d2ff" fill="url(#salaryGradient)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
-          {/* Top Companies Tab */}
-          {activeTab === "companies" && data.top_companies.length > 0 && (
-            <div className="bento-card rounded-lg p-6">
-              <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider mb-6 flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Top Hiring Companies
-              </h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="border-b border-outline-variant">
-                    <tr className="text-xs font-mono text-on-surface-variant">
-                      <th className="pb-3">Company</th>
-                      <th className="pb-3 text-right">Open Positions</th>
-                      <th className="pb-3 text-right">Avg Salary</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.top_companies.map((company, idx) => (
-                      <tr key={idx} className="border-b border-outline-variant/30 hover:bg-surface-dim/20 transition-colors">
-                        <td className="py-3 text-sm font-medium text-white">{company.name}</td>
-                        <td className="py-3 text-right text-sm text-on-surface-variant">{company.job_count.toLocaleString()}</td>
-                        <td className="py-3 text-right text-sm text-cyber-blue">
-                          {company.average_salary ? `${currencySymbol}${company.average_salary.toLocaleString(locale)}` : "N/A"}
-                        </td>
-                      </tr>
+                ) : (
+                  <div className="space-y-4 h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                    {fresherJobs.map((job, idx) => (
+                      <div key={idx} className="bg-surface-dim/30 rounded p-3 border border-outline-variant/30 hover:border-cyber-blue/30 transition-colors group">
+                        <div className="flex justify-between items-start mb-1 gap-2">
+                          <h4 className="text-sm font-bold text-white group-hover:text-cyber-blue transition-colors">
+                            {idx + 1}. {job.title}
+                          </h4>
+                          <span className="text-xs font-mono text-cyber-blue whitespace-nowrap bg-cyber-blue/10 px-2 py-0.5 rounded">
+                            {job.expected_salary}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-on-surface-variant mb-2">{job.description}</p>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono text-on-surface-variant">Demand Index:</span>
+                          <div className="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+                            <div className="h-full bg-cyber-blue rounded-full" style={{ width: `${job.demand}%` }}></div>
+                          </div>
+                          <span className="text-[10px] font-mono text-white">{job.demand}%</span>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="bento-card rounded-lg p-6 w-full">
+                <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider mb-6 flex items-center gap-2">
+                  <BarChart2 className="h-4 w-4" />
+                  Top Fresher Skills (AI)
+                </h3>
+                {loadingFresherJobs ? (
+                  <div className="w-full h-[300px] flex items-center justify-center">
+                    <Loader className="h-8 w-8 animate-spin text-cyber-blue" />
+                  </div>
+                ) : fresherSkills.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={fresherSkills} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                      <XAxis dataKey="name" tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} tickLine={false} />
+                      <YAxis tick={{ fill: "#9ca3af", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} unit="%" />
+                      <Tooltip content={<CustomTooltip currencySymbol={currencySymbol} locale={locale} />} />
+                      <Bar dataKey="percentage" name="Demand %" fill="#00ff88" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-[300px] flex items-center justify-center text-on-surface-variant font-mono text-sm">
+                    No skills data fetched.
+                  </div>
+                )}
               </div>
             </div>
           )}
-
           {/* Regional Data Tab */}
           {activeTab === "regional" && data.regional_salaries.length > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

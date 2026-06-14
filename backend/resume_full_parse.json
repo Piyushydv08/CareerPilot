@@ -48,15 +48,15 @@
                     "description": "Gained exposure to accounting and finance operations within a large-scale manufacturing organization, developing an understanding of corporate reporting, financial workflows and the role of finance. Acquired familiarity with SAP ERP and its application in integrating finance, procurement and inventory functions.",
                     "skills_used": [
                         "SAP ERP",
-                        "Financial workflows",
-                        "Corporate reporting"
+                        "Financial Modeling",
+                        "Problem Solving"
                     ]
                 }
             ]
         },
         "education": [
             {
-                "degree": "B.Tech. ICE",
+                "degree": "Bachelor of Technology",
                 "field_of_study": "Instrumentation And Control Engineering",
                 "institution": "Netaji Subhas University of Technology",
                 "year": "2023-2027"
@@ -64,13 +64,13 @@
             {
                 "degree": "Class XII",
                 "field_of_study": "",
-                "institution": "Shiv Jyoti Senior Secondary School, India",
+                "institution": "Shiv Jyoti Senior Secondary School",
                 "year": "2023"
             },
             {
                 "degree": "Class X",
                 "field_of_study": "",
-                "institution": "Saint Pauls School, India",
+                "institution": "Saint Pauls School",
                 "year": "2021"
             }
         ],
@@ -182,7 +182,7 @@
             "Machine Learning And Artifical Intelligence"
         ],
         "education_degrees": [
-            "B.Tech. Ice",
+            "Bachelor of Technology",
             "Class Xii",
             "Class X"
         ],

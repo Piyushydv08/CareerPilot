@@ -20,7 +20,6 @@ export const Sidebar: React.FC = () => {
   const pathname = usePathname();
 
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Engine", href: "/analyze", icon: Cpu },
     { name: "Simulator", href: "/simulator", icon: BrainCircuit },
     { name: "Interview", href: "/interview", icon: MessageSquareCode },

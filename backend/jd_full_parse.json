@@ -8,13 +8,13 @@
             "AI tools"
         ],
         "soft_skills": [
-            "Analytical thinking",
-            "Business acumen",
-            "Problem-solving ability",
-            "Presentation skills",
-            "Communication skills",
+            "Analytical Thinking",
+            "Problem Solving",
+            "Communication",
+            "Presentation",
+            "Attention to detail",
             "Structured thinking",
-            "Attention to detail"
+            "Business acumen"
         ],
         "experience_requirements": {
             "minimum_years": 0,
@@ -35,25 +35,20 @@
             "preferred_certifications": []
         },
         "project_requirements": [
-            "Retail analytics projects",
-            "Business intelligence projects",
-            "AI projects"
+            "Retail analytics",
+            "Business intelligence",
+            "AI"
         ],
         "responsibilities": [
             "Analyze business problems",
             "Extract, clean, and analyze data",
-            "Leverage AI tools for analysis",
+            "Leverage AI tools",
             "Identify trends and insights",
             "Prepare reports and presentations",
             "Conduct market and competitor research"
         ],
         "preferred_skills": [],
-        "keywords": [
-            "Retail analytics",
-            "Data",
-            "AI",
-            "Business intelligence"
-        ]
+        "keywords": []
     },
     "normalized": {
         "technical_skills": [
@@ -62,18 +57,13 @@
         ],
         "soft_skills": [
             "Analytical Thinking",
-            "Business Acumen",
-            "Problem-Solving Ability",
-            "Presentation Skills",
+            "Problem Solving",
             "Communication",
+            "Presentation",
+            "Attention To Detail",
             "Structured Thinking",
-            "Attention To Detail"
+            "Business Acumen"
         ],
-        "keywords": [
-            "Retail Analytics",
-            "Data",
-            "Artificial Intelligence",
-            "Business Intelligence"
-        ]
+        "keywords": []
     }
 }

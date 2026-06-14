@@ -1009,7 +1009,7 @@ async def generate_learning_path(payload: GenerateLearningPathRequest):
         "Each milestone MUST have exactly these fields:\n"
         '- "title": string (specific and action-oriented, e.g., "Master SQL Window Functions")\n'
         '- "description": string (2 sentences: what to learn and why it matters for the role)\n'
-        '- "resources": array of exactly 3 strings (real URLs or well-known book titles)\n\n'
+        '- "resources": array of exactly 3 strings (MUST be appropriate video links, such as YouTube or Udemy URLs for the specific topic)\n\n'
         "Return ONLY the raw JSON array. No markdown. No explanation."
     )
 
