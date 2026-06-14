@@ -420,6 +420,16 @@ export default function AnalyzePage() {
         </p>
       </header>
 
+      {resumeData && jobInput.trim() && (
+        <div className="flex items-center justify-center mb-8 opacity-80 animate-fade-in">
+          <div className="h-px bg-gradient-to-r from-transparent via-cyber-blue/40 to-transparent flex-1 max-w-[200px]" />
+          <span className="px-4 font-mono text-[11px] font-bold text-cyber-blue uppercase tracking-widest text-center animate-pulse">
+            Scroll down to see your full ATS breakdown
+          </span>
+          <div className="h-px bg-gradient-to-r from-transparent via-cyber-blue/40 to-transparent flex-1 max-w-[200px]" />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         {/* Left Side — Upload + JD */}
         <div className="lg:col-span-5 flex flex-col gap-6">
@@ -679,25 +689,6 @@ export default function AnalyzePage() {
                 </div>
               </div>
 
-              {/* ── ATS Detailed Score Card ── */}
-              {atsMatchDetail && (
-                <div className="bento-card rounded-lg p-6 flex flex-col gap-4 animate-fade-slide-up">
-                  <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
-                    <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
-                      <ListChecks className="h-4 w-4" />
-                      <span>ATS Compatibility Breakdown</span>
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      {atsMatchDetail.is_ai_powered && (
-                        <span className="flex items-center gap-1 font-mono text-[9px] text-cyber-blue bg-cyber-blue/10 border border-cyber-blue/20 px-2 py-0.5 rounded-sm uppercase tracking-wider">
-                          <Zap className="h-2.5 w-2.5" /> Gemini 2.0 Flash
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <ATSDetailPanel detail={atsMatchDetail} />
-                </div>
-              )}
             </>
           ) : (
             <div className="bento-card rounded-lg p-12 flex flex-col items-center justify-center text-center text-on-surface-variant">
@@ -738,128 +729,152 @@ export default function AnalyzePage() {
             </div>
           )}
 
-          {/* Job Listings Panel */}
-          {(isFetchingJobs || jobsData || jobsError) && (
-            <div className="bento-card rounded-lg p-6 flex flex-col gap-5 animate-fade-slide-up">
-              <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
-                <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
-                  <TrendingUp className="h-4 w-4" /><span>Matched Job Listings</span>
-                </h3>
-                {jobsData && (
-                  <div className="flex items-center gap-2">
-                    {jobInput.trim() && (
-                      <span className="font-mono text-[9px] text-amber-400 border border-amber-400/20 bg-amber-400/5 px-2 py-0.5 rounded-sm uppercase tracking-wider">
-                        JD Filter Active
-                      </span>
-                    )}
-                    <span className="font-mono text-[9px] text-on-surface-variant bg-surface-dim border border-outline-variant px-2 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-1">
-                      <Wifi className="h-2.5 w-2.5 text-cyber-blue" />
-                      {jobsData.total_count.toLocaleString()} live openings
-                    </span>
-                  </div>
+        </div>
+      </div>
+
+      {/* Bottom Centered Sections */}
+      <div className="flex flex-col gap-8 max-w-4xl mx-auto mt-8 w-full">
+        {/* ── ATS Detailed Score Card ── */}
+        {atsMatchDetail && (
+          <div className="bento-card rounded-lg p-6 flex flex-col gap-4 animate-fade-slide-up">
+            <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
+              <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
+                <ListChecks className="h-4 w-4" />
+                <span>ATS Compatibility Breakdown</span>
+              </h3>
+              <div className="flex items-center gap-2">
+                {atsMatchDetail.is_ai_powered && (
+                  <span className="flex items-center gap-1 font-mono text-[9px] text-cyber-blue bg-cyber-blue/10 border border-cyber-blue/20 px-2 py-0.5 rounded-sm uppercase tracking-wider">
+                    <Zap className="h-2.5 w-2.5" /> Gemini 2.0 Flash
+                  </span>
                 )}
               </div>
+            </div>
+            <ATSDetailPanel detail={atsMatchDetail} />
+          </div>
+        )}
 
-              {isFetchingJobs && (
-                <div className="space-y-3 animate-pulse">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="p-4 rounded border border-outline-variant/30 bg-surface-container-low flex flex-col gap-2">
-                      <div className="h-4 bg-surface-container-high rounded shimmer-bg w-2/3" />
-                      <div className="h-3 bg-surface-container rounded shimmer-bg w-1/3" />
-                      <div className="h-3 bg-surface-container rounded shimmer-bg w-full mt-1" />
-                      <div className="h-3 bg-surface-container rounded shimmer-bg w-4/5" />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {jobsError && !isFetchingJobs && (
-                <div className="flex items-center gap-2 text-red-400 font-mono text-xs p-4 border border-red-500/20 rounded bg-red-500/5">
-                  <AlertTriangle className="h-4 w-4 shrink-0" /><span>{jobsError}</span>
-                </div>
-              )}
-
-              {jobsData && !isFetchingJobs && (
-                <div className="flex flex-col gap-3">
-                  {jobsData.jobs.length === 0 ? (
-                    <p className="font-mono text-[10px] text-on-surface-variant/50 text-center py-6 uppercase tracking-wider">
-                      No jobs found for your profile. Try adding a job description above.
-                    </p>
-                  ) : (
-                    <>
-                      {jobsData.jobs.map((job) => {
-                        const salary = job.salary_min
-                          ? `₹${Math.round(job.salary_min / 1000)}k${job.salary_is_predicted ? " est." : ""}`
-                          : null;
-                        const isRemote = job.location?.toLowerCase().includes("remote") || job.location === "IN";
-                        const workType = isRemote ? "Remote" : job.contract_time === "full_time" ? "Full-time" : job.contract_time ?? "—";
-                        const daysAgo = job.created
-                          ? Math.max(0, Math.floor((Date.now() - new Date(job.created).getTime()) / 86400000))
-                          : null;
-                        return (
-                          <a
-                            key={job.id}
-                            href={job.redirect_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="group p-4 rounded border border-outline-variant/40 bg-[#07070a]/50 hover:border-cyber-blue/40 hover:bg-cyber-blue/[0.03] transition-all duration-200 flex flex-col gap-2.5"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <h4 className="text-sm font-semibold text-white group-hover:text-cyber-blue transition-colors leading-snug truncate">
-                                  {job.title}
-                                </h4>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <Building className="h-3 w-3 text-on-surface-variant shrink-0" />
-                                  <span className="font-mono text-[10px] text-on-surface-variant truncate">{job.company}</span>
-                                </div>
-                              </div>
-                              {salary && (
-                                <div className="shrink-0 flex flex-col items-end">
-                                  <span className="font-mono text-sm font-bold text-cyber-blue">{salary}</span>
-                                  {job.salary_is_predicted && (
-                                    <span className="font-mono text-[8px] text-on-surface-variant/50 uppercase">predicted</span>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 flex-wrap">
-                              <span className="flex items-center gap-1 font-mono text-[9px] text-on-surface-variant/70">
-                                <MapPin className="h-2.5 w-2.5" />{job.location || "Location not specified"}
-                              </span>
-                              <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-sm border uppercase tracking-wider ${isRemote ? "text-cyber-blue border-cyber-blue/20 bg-cyber-blue/5"
-                                : "text-on-surface-variant border-outline-variant/30 bg-surface-container-low"
-                                }`}>{workType}</span>
-                              <span className="font-mono text-[9px] px-1.5 py-0.5 rounded-sm border border-outline-variant/20 bg-surface-container-low text-on-surface-variant/60 uppercase tracking-wider">
-                                {job.category}
-                              </span>
-                              {daysAgo !== null && (
-                                <span className="font-mono text-[9px] text-on-surface-variant/40 ml-auto">
-                                  {daysAgo === 0 ? "Today" : `${daysAgo}d ago`}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[11px] text-on-surface-variant/60 leading-relaxed line-clamp-2">
-                              {job.description.slice(0, 180)}...
-                            </p>
-                            <div className="flex items-center justify-end pt-1">
-                              <span className="font-mono text-[9px] text-cyber-blue uppercase tracking-wider flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                View & Apply <Send className="h-2.5 w-2.5" />
-                              </span>
-                            </div>
-                          </a>
-                        );
-                      })}
-                      <p className="font-mono text-[9px] text-on-surface-variant/40 text-center pt-1 uppercase tracking-wider">
-                        Showing {jobsData.jobs.length} of {jobsData.total_count.toLocaleString()} openings · Adzuna India
-                      </p>
-                    </>
+        {/* Job Listings Panel */}
+        {(isFetchingJobs || jobsData || jobsError) && (
+          <div className="bento-card rounded-lg p-6 flex flex-col gap-5 animate-fade-slide-up">
+            <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
+              <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4" /><span>Matched Job Listings</span>
+              </h3>
+              {jobsData && (
+                <div className="flex items-center gap-2">
+                  {jobInput.trim() && (
+                    <span className="font-mono text-[9px] text-amber-400 border border-amber-400/20 bg-amber-400/5 px-2 py-0.5 rounded-sm uppercase tracking-wider">
+                      JD Filter Active
+                    </span>
                   )}
+                  <span className="font-mono text-[9px] text-on-surface-variant bg-surface-dim border border-outline-variant px-2 py-0.5 rounded-sm uppercase tracking-wider flex items-center gap-1">
+                    <Wifi className="h-2.5 w-2.5 text-cyber-blue" />
+                    {jobsData.total_count.toLocaleString()} live openings
+                  </span>
                 </div>
               )}
             </div>
-          )}
-        </div>
+
+            {isFetchingJobs && (
+              <div className="space-y-3 animate-pulse">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="p-4 rounded border border-outline-variant/30 bg-surface-container-low flex flex-col gap-2">
+                    <div className="h-4 bg-surface-container-high rounded shimmer-bg w-2/3" />
+                    <div className="h-3 bg-surface-container rounded shimmer-bg w-1/3" />
+                    <div className="h-3 bg-surface-container rounded shimmer-bg w-full mt-1" />
+                    <div className="h-3 bg-surface-container rounded shimmer-bg w-4/5" />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {jobsError && !isFetchingJobs && (
+              <div className="flex items-center gap-2 text-red-400 font-mono text-xs p-4 border border-red-500/20 rounded bg-red-500/5">
+                <AlertTriangle className="h-4 w-4 shrink-0" /><span>{jobsError}</span>
+              </div>
+            )}
+
+            {jobsData && !isFetchingJobs && (
+              <div className="flex flex-col gap-3">
+                {jobsData.jobs.length === 0 ? (
+                  <p className="font-mono text-[10px] text-on-surface-variant/50 text-center py-6 uppercase tracking-wider">
+                    No jobs found for your profile. Try adding a job description above.
+                  </p>
+                ) : (
+                  <>
+                    {jobsData.jobs.map((job) => {
+                      const salary = job.salary_min
+                        ? `₹${Math.round(job.salary_min / 1000)}k${job.salary_is_predicted ? " est." : ""}`
+                        : null;
+                      const isRemote = job.location?.toLowerCase().includes("remote") || job.location === "IN";
+                      const workType = isRemote ? "Remote" : job.contract_time === "full_time" ? "Full-time" : job.contract_time ?? "—";
+                      const daysAgo = job.created
+                        ? Math.max(0, Math.floor((Date.now() - new Date(job.created).getTime()) / 86400000))
+                        : null;
+                      return (
+                        <a
+                          key={job.id}
+                          href={job.redirect_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group p-4 rounded border border-outline-variant/40 bg-[#07070a]/50 hover:border-cyber-blue/40 hover:bg-cyber-blue/[0.03] transition-all duration-200 flex flex-col gap-2.5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="text-sm font-semibold text-white group-hover:text-cyber-blue transition-colors leading-snug truncate">
+                                {job.title}
+                              </h4>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <Building className="h-3 w-3 text-on-surface-variant shrink-0" />
+                                <span className="font-mono text-[10px] text-on-surface-variant truncate">{job.company}</span>
+                              </div>
+                            </div>
+                            {salary && (
+                              <div className="shrink-0 flex flex-col items-end">
+                                <span className="font-mono text-sm font-bold text-cyber-blue">{salary}</span>
+                                {job.salary_is_predicted && (
+                                  <span className="font-mono text-[8px] text-on-surface-variant/50 uppercase">predicted</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="flex items-center gap-1 font-mono text-[9px] text-on-surface-variant/70">
+                              <MapPin className="h-2.5 w-2.5" />{job.location || "Location not specified"}
+                            </span>
+                            <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-sm border uppercase tracking-wider ${isRemote ? "text-cyber-blue border-cyber-blue/20 bg-cyber-blue/5"
+                              : "text-on-surface-variant border-outline-variant/30 bg-surface-container-low"
+                              }`}>{workType}</span>
+                            <span className="font-mono text-[9px] px-1.5 py-0.5 rounded-sm border border-outline-variant/20 bg-surface-container-low text-on-surface-variant/60 uppercase tracking-wider">
+                              {job.category}
+                            </span>
+                            {daysAgo !== null && (
+                              <span className="font-mono text-[9px] text-on-surface-variant/40 ml-auto">
+                                {daysAgo === 0 ? "Today" : `${daysAgo}d ago`}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-on-surface-variant/60 leading-relaxed line-clamp-2">
+                            {job.description.slice(0, 180)}...
+                          </p>
+                          <div className="flex items-center justify-end pt-1">
+                            <span className="font-mono text-[9px] text-cyber-blue uppercase tracking-wider flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              View & Apply <Send className="h-2.5 w-2.5" />
+                            </span>
+                          </div>
+                        </a>
+                      );
+                    })}
+                    <p className="font-mono text-[9px] text-on-surface-variant/40 text-center pt-1 uppercase tracking-wider">
+                      Showing {jobsData.jobs.length} of {jobsData.total_count.toLocaleString()} openings · Adzuna India
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
