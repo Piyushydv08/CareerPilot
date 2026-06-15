@@ -58,6 +58,7 @@ class MatchAnalysisResponse(BaseModel):
     matched_keywords: List[str] = Field(default_factory=list)
     missing_keywords: List[str] = Field(default_factory=list)
     suggestions: List[str] = Field(default_factory=list)
+    recommendation_markdown: Optional[str] = None
     missing_terms: List[MissingTerm] = Field(default_factory=list)  # Kept for backward compat
     is_ai_powered: bool = False
     resume_skills: List[str] = Field(default_factory=list)   # Skills extracted from resume

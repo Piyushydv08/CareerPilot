@@ -186,6 +186,65 @@ def extract_json(text: str) -> dict:
         raise ValueError(f"No valid JSON: {text[:200]}")
 
 
+def get_personalized_recommendation(technical_skills: list[str], soft_skills: list[str]) -> str:
+    if IS_GEMINI_MOCK:
+        return ""
+    
+    prompt = f"""You are an experienced Career Coach, Data Science Mentor, and Technical Interview Expert.
+
+Analyze the candidate's gap skills and provide personalized recommendations.
+
+Technical Skills:
+{", ".join(technical_skills)}
+
+Soft Skills:
+{", ".join(soft_skills)}
+
+Instructions
+3. Provide recommendations in the following sections:
+
+### Technical Skill Recommendations
+For each technical skill:
+- Explain its importance in industry.
+- Mention whether the candidate should:
+  - Maintain it
+  - Improve it
+  - Learn advanced concepts
+- Suggest specific topics to study next.
+
+### Soft Skill Recommendations
+For each soft skill:
+- Explain why it matters.
+- Mention practical ways to improve it.
+- Suggest real-world activities to develop it.
+
+### Career-Oriented Recommendations
+Based on the overall skill profile:
+- Recommend suitable career paths.
+- Mention the top skills that should be prioritized.
+- Mention skills that are most important for placements and interviews.
+
+### Learning Roadmap
+Create:
+- Immediate Focus (next 10 days)
+
+Ensure recommendations are practical, actionable, and tailored to the provided skills.
+Do not generate generic advice."""
+
+    try:
+        client = get_gemini_client()
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(temperature=0.7)
+        )
+        return response.text or ""
+    except Exception as e:
+        logger.error(f"Error generating recommendation: {e}")
+        return ""
+
+
+
 # ----------------------------------------------------------------------
 # New detailed ATS prompt (supports both JD-present and JD-missing cases)
 # ----------------------------------------------------------------------
@@ -559,6 +618,10 @@ async def analyze_match_score(
     resume_data_parsed["normalized"]["technical_skills"] = resume_skills
     resume_data_parsed["normalized"]["soft_skills"] = resume_soft_skills
 
+    # Wrap the root fields into a "raw" dictionary to match the schema expected by calculate_comprehensive_ats_score
+    if "raw" not in resume_data_parsed:
+        resume_data_parsed["raw"] = {k: v for k, v in resume_data_parsed.items() if k not in ("normalized", "raw")}
+
     # ── Set-difference gap computation ───────────────────────────────────────
     resume_set = {s.lower() for s in resume_skills}
     jd_lower_map = {s.lower(): s for s in jd_skills}  # lowercase → canonical
@@ -604,13 +667,16 @@ async def analyze_match_score(
         missing_keywords = deduplicate_normalized_list(ats.get("missing_keywords", []))
 
     suggestions = ats.get("recommendations", [])
-    if missing_skills:
-        for ms in missing_skills:
-            suggestions.append(f"Please focus on improvising {ms}")
-            
-    if missing_soft_skills:
-        for ms in missing_soft_skills:
-            suggestions.append(f"Please focus on improvising {ms}")
+    recommendation_markdown = None
+
+    if missing_skills or missing_soft_skills:
+        # Call Gemini for a personalized recommendation based on the gaps
+        import asyncio
+        recommendation_markdown = await asyncio.to_thread(
+            get_personalized_recommendation, 
+            missing_skills, 
+            missing_soft_skills
+        )
 
     # ── Deduplicate all skill lists before returning ──────────────────────────
     resume_skills = deduplicate_normalized_list(resume_skills)
@@ -646,6 +712,7 @@ async def analyze_match_score(
         matched_keywords=matched_keywords[:15],
         missing_keywords=missing_keywords[:15],
         suggestions=suggestions[:5],
+        recommendation_markdown=recommendation_markdown,
         missing_terms=[],
         is_ai_powered=is_ai_powered,
         resume_skills=resume_skills,

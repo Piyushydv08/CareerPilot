@@ -35,6 +35,7 @@ export interface ATSMatchDetail {
   matched_keywords: string[];
   missing_keywords: string[];
   suggestions: string[];
+  recommendation_markdown?: string;
   is_ai_powered: boolean;
   missing_skills: string[];   // jd_skills − resume_skills (canonical, normalized)
   matched_skills: string[];   // jd_skills ∩ resume_skills
@@ -198,6 +199,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           matched_keywords: data.matched_keywords || [],
           missing_keywords: data.missing_keywords || [],
           suggestions: data.suggestions || [],
+          recommendation_markdown: data.recommendation_markdown,
           is_ai_powered: data.is_ai_powered || false,
           missing_skills: data.missing_skills || data.gap_skills || [],
           matched_skills: data.matched_skills || [],

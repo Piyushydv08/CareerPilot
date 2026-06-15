@@ -1,7 +1,7 @@
 {
     "raw": {
         "job_title": "Business Analyst Intern",
-        "department": "Retail Analytics, Data & AI",
+        "department": "",
         "seniority_level": "Intern",
         "technical_skills": [
             "SQL",
@@ -48,7 +48,12 @@
             "Conduct market and competitor research"
         ],
         "preferred_skills": [],
-        "keywords": []
+        "keywords": [
+            "Retail Analytics",
+            "Data",
+            "AI",
+            "Business Intelligence"
+        ]
     },
     "normalized": {
         "technical_skills": [
@@ -64,6 +69,11 @@
             "Structured Thinking",
             "Business Acumen"
         ],
-        "keywords": []
+        "keywords": [
+            "Retail Analytics",
+            "Data",
+            "Artificial Intelligence",
+            "Business Intelligence"
+        ]
     }
 }

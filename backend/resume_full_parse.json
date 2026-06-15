@@ -48,8 +48,8 @@
                     "description": "Gained exposure to accounting and finance operations within a large-scale manufacturing organization, developing an understanding of corporate reporting, financial workflows and the role of finance. Acquired familiarity with SAP ERP and its application in integrating finance, procurement and inventory functions.",
                     "skills_used": [
                         "SAP ERP",
-                        "Financial Modeling",
-                        "Problem Solving"
+                        "Financial workflows",
+                        "Corporate reporting"
                     ]
                 }
             ]
@@ -119,16 +119,15 @@
         ],
         "keywords": [
             "Python",
-            "Machine Learning",
-            "Data Analysis",
-            "SQL",
             "NLP",
-            "Generative AI",
-            "LLM APIs",
-            "Resume Parsing",
-            "Scikit-learn",
-            "Streamlit",
-            "TMDB API"
+            "Machine Learning",
+            "Data Analytics",
+            "SQL",
+            "Excel",
+            "Data Visualization",
+            "SAP ERP",
+            "Financial workflows",
+            "Corporate reporting"
         ]
     },
     "normalized": {
@@ -164,16 +163,15 @@
         ],
         "keywords": [
             "Python",
-            "Machine Learning",
-            "Data Analysis",
-            "Sql",
             "Natural Language Processing",
-            "Generative Ai",
-            "Llm Apis",
-            "Resume Parsing",
-            "Scikit-Learn",
-            "Streamlit",
-            "Tmdb Api"
+            "Machine Learning",
+            "Data Analytics",
+            "Sql",
+            "Excel",
+            "Data Visualization",
+            "Sap Erp",
+            "Financial Workflows",
+            "Corporate Reporting"
         ],
         "certifications": [],
         "project_domains": [

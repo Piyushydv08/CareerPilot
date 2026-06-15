@@ -1009,7 +1009,7 @@ async def generate_learning_path(payload: GenerateLearningPathRequest):
         "Each milestone MUST have exactly these fields:\n"
         '- "title": string (specific and action-oriented, e.g., "Master SQL Window Functions")\n'
         '- "description": string (2 sentences: what to learn and why it matters for the role)\n'
-        '- "resources": array of exactly 3 strings (MUST be appropriate video links, such as YouTube or Udemy URLs for the specific topic)\n\n'
+        '- "resources": array of 3 to 4 strings (MUST include appropriate video links like YouTube/Udemy AND official documentation links for the specific topic)\n\n'
         "Return ONLY the raw JSON array. No markdown. No explanation."
     )
 
@@ -1025,7 +1025,7 @@ async def generate_learning_path(payload: GenerateLearningPathRequest):
             LearningMilestone(
                 title=str(m.get("title", f"Master {payload.gaps[i] if i < len(payload.gaps) else 'Skill'}")),
                 description=str(m.get("description", "")),
-                resources=[str(r) for r in m.get("resources", [])][:3],
+                resources=[str(r) for r in m.get("resources", [])][:5],
             )
             for i, m in enumerate(milestones_raw[:4])
             if isinstance(m, dict)
@@ -1045,6 +1045,7 @@ async def generate_learning_path(payload: GenerateLearningPathRequest):
                 resources=[
                     f"https://www.youtube.com/results?search_query={gap.replace(' ', '+')}+full+course",
                     f"https://www.udemy.com/courses/search/?q={gap.replace(' ', '+')}",
+                    f"https://devdocs.io/#q={gap.replace(' ', '+')}",
                     "https://www.freecodecamp.org/",
                 ],
             )

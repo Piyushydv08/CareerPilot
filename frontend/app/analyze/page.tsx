@@ -169,7 +169,7 @@ function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
           <div className="flex items-center gap-1.5 mb-3">
             <ShieldCheck className="h-3.5 w-3.5 text-cyber-blue" />
             <span className="font-mono text-[10px] uppercase tracking-wider text-cyber-blue font-semibold">
-              Matched Keywords
+              Matched Skills
             </span>
             <span className="ml-auto font-mono text-[9px] text-cyber-blue/60 border border-cyber-blue/20 px-1.5 py-0.5 rounded-sm">
               {detail.matched_keywords.length}
@@ -196,7 +196,7 @@ function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
           <div className="flex items-center gap-1.5 mb-3">
             <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
             <span className="font-mono text-[10px] uppercase tracking-wider text-red-400 font-semibold">
-              Missing Keywords
+              Missing Skills
             </span>
             <span className="ml-auto font-mono text-[9px] text-red-400/60 border border-red-500/20 px-1.5 py-0.5 rounded-sm">
               {detail.missing_keywords.length}
@@ -220,7 +220,7 @@ function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
       </div>
 
       {/* Suggestions */}
-      {detail.suggestions.length > 0 && (
+      {(detail.recommendation_markdown || detail.suggestions.length > 0) && (
         <div className="border-t border-outline-variant/40 pt-5">
           <div className="flex items-center gap-1.5 mb-3">
             <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
@@ -228,17 +228,23 @@ function ATSDetailPanel({ detail }: { detail: ATSMatchDetail }) {
               Recommendations
             </span>
           </div>
-          <div className="flex flex-col gap-2">
-            {detail.suggestions.map((s, i) => (
-              <div
-                key={i}
-                className="flex gap-2.5 p-3 rounded border border-amber-500/15 bg-amber-500/[0.04] text-on-surface-variant text-xs leading-relaxed"
-              >
-                <ChevronRight className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
-                <span>{s}</span>
-              </div>
-            ))}
-          </div>
+          {detail.recommendation_markdown ? (
+            <div className="prose prose-invert prose-sm max-w-none text-on-surface-variant leading-relaxed text-sm [&>p]:mb-4 [&>h1]:text-white [&>h2]:text-white [&>h3]:text-cyber-blue [&>strong]:text-white">
+              <ReactMarkdown>{detail.recommendation_markdown}</ReactMarkdown>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {detail.suggestions.map((s, i) => (
+                <div
+                  key={i}
+                  className="flex gap-2.5 p-3 rounded border border-amber-500/15 bg-amber-500/[0.04] text-on-surface-variant text-xs leading-relaxed"
+                >
+                  <ChevronRight className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                  <span>{s}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -745,7 +751,7 @@ export default function AnalyzePage() {
               <div className="flex items-center gap-2">
                 {atsMatchDetail.is_ai_powered && (
                   <span className="flex items-center gap-1 font-mono text-[9px] text-cyber-blue bg-cyber-blue/10 border border-cyber-blue/20 px-2 py-0.5 rounded-sm uppercase tracking-wider">
-                    <Zap className="h-2.5 w-2.5" /> Gemini 2.0 Flash
+                    <Zap className="h-2.5 w-2.5" />
                   </span>
                 )}
               </div>
