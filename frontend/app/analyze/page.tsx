@@ -487,13 +487,23 @@ export default function AnalyzePage() {
                       {uploadedFileName}
                     </p>
                     <p className="font-mono text-[9px] text-on-surface-variant/50 uppercase tracking-wider mt-1">
-                      Resume indexed · click to replace
+                      Resume indexed
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 mt-1">
                     <CheckCircle className="h-3.5 w-3.5 text-cyber-blue" />
                     <span className="font-mono text-[9px] text-cyber-blue uppercase tracking-wider">Profile Active</span>
                   </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUploadClick();
+                    }}
+                    className="mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded border border-cyber-blue/30 bg-cyber-blue/5 text-[9px] font-mono font-bold uppercase tracking-wider text-cyber-blue hover:bg-cyber-blue hover:text-black transition-all duration-200 cursor-pointer"
+                  >
+                    <UploadCloud className="h-3.5 w-3.5" />
+                    <span>Reupload Resume</span>
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-col items-center p-10">
