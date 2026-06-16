@@ -1,78 +1,113 @@
 {
     "raw": {
-        "job_title": "IT Support - Other",
-        "department": "IT & Information Security",
+        "job_title": "Full Stack Developer",
+        "department": "",
         "seniority_level": "",
         "technical_skills": [
-            "Python",
-            "TensorFlow",
-            "PyTorch",
-            "Machine Learning",
-            "Deep Learning",
-            "Generative AI",
-            "Diffusion Models",
-            "MLOps",
-            "Cloud",
-            "Vector DBs",
-            "Artificial Intelligence",
-            "OpenAI",
-            "Hugging Face",
-            "LangChain",
-            "Azure"
+            "JavaScript",
+            "HTML",
+            "CSS",
+            "React",
+            "Angular",
+            "Vue.js",
+            "Node.js",
+            "Express",
+            "MongoDB",
+            "MySQL",
+            "PostgreSQL",
+            "Git",
+            "Agile",
+            "Scrum"
         ],
-        "soft_skills": [],
+        "soft_skills": [
+            "Communication",
+            "Teamwork",
+            "Problem Solving",
+            "Adaptability",
+            "Time Management"
+        ],
         "experience_requirements": {
-            "minimum_years": 0,
+            "minimum_years": 2,
             "maximum_years": 0,
-            "required_domains": [],
-            "preferred_domains": []
+            "required_domains": [
+                "Software Development",
+                "Web Development"
+            ],
+            "preferred_domains": [
+                "Cloud Computing",
+                "DevOps"
+            ]
         },
         "education_requirements": {
             "required_degrees": [
-                "M.Tech",
-                "B.Tech"
+                "Bachelor's Degree"
             ],
-            "preferred_degrees": [],
+            "preferred_degrees": [
+                "Master's Degree"
+            ],
             "required_fields_of_study": [
-                "AI/ML",
                 "Computer Science",
-                "Artificial Intelligence and Machine Learning"
+                "Information Technology"
             ],
-            "preferred_fields_of_study": []
+            "preferred_fields_of_study": [
+                "Software Engineering"
+            ]
         },
         "certification_requirements": {
             "required_certifications": [],
-            "preferred_certifications": []
+            "preferred_certifications": [
+                "Certified Scrum Master",
+                "Certified Full Stack Developer"
+            ]
         },
-        "project_requirements": [],
-        "responsibilities": [
-            "Assist in building Generative AI solutions",
-            "Develop and optimize ML/DL models",
-            "Support MLOps pipelines & AI deployments",
-            "Work with cross-functional teams on real-world AI applications"
+        "project_requirements": [
+            "Web Application Development",
+            "Mobile Application Development"
         ],
-        "preferred_skills": [],
-        "keywords": []
+        "responsibilities": [
+            "Design and Development",
+            "Testing and Debugging",
+            "Collaboration with Cross-Functional Teams"
+        ],
+        "preferred_skills": [
+            "Cloud Platforms",
+            "Containerization",
+            "Microservices Architecture"
+        ],
+        "keywords": [
+            "Full Stack Development",
+            "Web Development",
+            "Software Development"
+        ]
     },
     "normalized": {
         "technical_skills": [
-            "Python",
-            "TensorFlow",
-            "PyTorch",
-            "Machine Learning",
-            "Deep Learning",
-            "Generative AI",
-            "Diffusion Models",
-            "MLOps",
-            "Cloud",
-            "Vector DBs",
-            "Artificial Intelligence",
-            "OpenAI",
-            "Hugging Face",
-            "LangChain",
-            "Azure"
+            "JavaScript",
+            "HTML",
+            "CSS",
+            "React",
+            "Angular",
+            "Vue.js",
+            "Node.js",
+            "Express.js",
+            "MongoDB",
+            "MySQL",
+            "PostgreSQL",
+            "Git",
+            "Agile",
+            "Scrum"
         ],
-        "soft_skills": [],
-        "keywords": []
+        "soft_skills": [
+            "Communication",
+            "Teamwork",
+            "Problem Solving",
+            "Adaptability",
+            "Time Management"
+        ],
+        "keywords": [
+            "Full Stack Development",
+            "Web Development",
+            "Software Development"
+        ]
     }
 }

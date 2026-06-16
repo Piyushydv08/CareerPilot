@@ -299,6 +299,10 @@ export default function AnalyzePage() {
   const [isFetchingJobs, setIsFetchingJobs] = useState(false);
   const [jobsError, setJobsError] = useState<string | null>(null);
 
+  const showAtsCard = !!(resumeData && atsMatchDetail);
+  const showJobsCard = !!(isFetchingJobs || jobsData || jobsError);
+  const hasRecommendation = !!(atsMatchDetail && (atsMatchDetail.recommendation_markdown || (atsMatchDetail.suggestions && atsMatchDetail.suggestions.length > 0)));
+
   const parsingSteps = [
     "Decrypting file structure...",
     "Extracting semantic typography grids...",
@@ -595,7 +599,7 @@ export default function AnalyzePage() {
                   <div className="flex items-center gap-3.5 bg-cyber-blue/5 border border-cyber-blue/10 rounded px-3 py-1.5">
                     <div className="text-right">
                       <span className="font-mono text-[9px] text-on-surface-variant block leading-none uppercase">
-                        {atsMatchDetail ? "ATS Match Score" : "Resume Quality"}
+                        ATS Score
                       </span>
                       <span className={`font-mono text-base font-bold mt-1 block ${matchScore >= 75 ? "text-cyber-blue" : matchScore >= 50 ? "text-amber-400" : "text-red-400"}`}>
                         {matchScore}%
@@ -650,7 +654,7 @@ export default function AnalyzePage() {
                             ? "No gaps detected — all JD skills found in resume."
                             : jobInput.trim()
                               ? "Click \u2018Run ATS Check\u2019 to detect missing JD skills."
-                              : "Enter a job description above and click Analyze to detect missing skills."}
+                              : "Enter a job description to detect missing skills."}
                         </span>
                       )}
                     </div>
@@ -739,9 +743,12 @@ export default function AnalyzePage() {
       </div>
 
       {/* Bottom Centered Sections */}
-      <div className="flex flex-col gap-8 max-w-4xl mx-auto mt-8 w-full">
+      <div className={`grid grid-cols-1 gap-8 mx-auto mt-8 w-full items-start ${showAtsCard && showJobsCard && hasRecommendation
+        ? "lg:grid-cols-2 lg:max-w-none"
+        : "max-w-4xl"
+        }`}>
         {/* ── ATS Detailed Score Card ── */}
-        {atsMatchDetail && (
+        {showAtsCard && (
           <div className="bento-card rounded-lg p-6 flex flex-col gap-4 animate-fade-slide-up">
             <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
               <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
@@ -761,7 +768,7 @@ export default function AnalyzePage() {
         )}
 
         {/* Job Listings Panel */}
-        {(isFetchingJobs || jobsData || jobsError) && (
+        {showJobsCard && (
           <div className="bento-card rounded-lg p-6 flex flex-col gap-5 animate-fade-slide-up">
             <div className="flex items-center justify-between border-b border-outline-variant/60 pb-3">
               <h3 className="font-mono text-xs font-bold text-cyber-blue uppercase tracking-wider flex items-center gap-1.5">
