@@ -26,6 +26,8 @@ class ResumeDataSchema(BaseModel):
     gaps: List[SkillGapSchema]
     ats_score: Optional[int] = 0
     raw_text: Optional[str] = None  # Full extracted resume text for ATS analysis
+    technical_skills: List[str] = Field(default_factory=list)
+    soft_skills: List[str] = Field(default_factory=list)
 
 # --- Cover Letter Models ---
 class CoverLetterRequest(BaseModel):

@@ -894,7 +894,9 @@ async def upload_resume(
             normalized_projects = deduplicate_normalized_list([normalize_project_domain(p.get("domain", "")) for p in raw_parsed.get("projects", []) if isinstance(p, dict)])
             normalized_degrees = deduplicate_normalized_list([normalize_education_degree(e.get("degree", "")) for e in raw_parsed.get("education", []) if isinstance(e, dict)])
             normalized_fields = deduplicate_normalized_list([normalize_education_field(e.get("field_of_study", "")) for e in raw_parsed.get("education", []) if isinstance(e, dict)])
-            normalized_titles = deduplicate_normalized_list([normalize_job_title(r.get("designation", "")) for r in raw_parsed.get("experience", {}).get("roles", []) if isinstance(r, dict)])
+            exp_data = raw_parsed.get("experience", {})
+            roles_data = exp_data.get("roles", []) if isinstance(exp_data, dict) else (exp_data if isinstance(exp_data, list) else [])
+            normalized_titles = deduplicate_normalized_list([normalize_job_title(r.get("designation", "")) for r in roles_data if isinstance(r, dict)])
             
             # Construct Final Resume Parser Output
             parsed_data_json: dict[str, Any] = {

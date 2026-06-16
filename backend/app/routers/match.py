@@ -234,7 +234,7 @@ Do not generate generic advice."""
     try:
         client = get_gemini_client()
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             contents=prompt,
             config=types.GenerateContentConfig(temperature=0.7)
         )
@@ -375,7 +375,7 @@ def run_detailed_ats_analysis(resume_text: str, job_description: str) -> dict:
         job_description=job_description[:5000] if job_description else "Not provided."
     )
     response = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model="gemini-flash-latest",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -389,24 +389,40 @@ def run_detailed_ats_analysis(resume_text: str, job_description: str) -> dict:
 # ----------------------------------------------------------------------
 def fallback_detailed_analysis(resume_text: str, job_description: str, resume_data=None) -> dict:
     """When Gemini fails, return a basic but valid structure using simple heuristics."""
-    # Basic extraction from resume_text (very naive)
+    # Basic extraction from resume_text
     lines = [l.strip() for l in resume_text.split('\n') if l.strip()]
-    name = lines[0] if lines else "Unknown"
-    email_match = re.search(r'[\w.-]+@[\w.-]+', resume_text)
-    email = email_match.group(0) if email_match else ""
-
+    name = resume_data.name if resume_data and resume_data.name else (lines[0] if lines else "Unknown")
+    email = resume_data.email if resume_data and resume_data.email else ""
+    
+    # Extract skills from payload if available
+    tech_skills = []
+    if resume_data and resume_data.skills:
+        tech_skills = [s.name for s in resume_data.skills]
+    
+    # Simple naive extraction if payload empty
+    if not tech_skills:
+        common_tech = ["Python", "JavaScript", "React", "SQL", "Java", "C++", "AWS", "Docker", "Node.js", "Machine Learning"]
+        tech_skills = [s for s in common_tech if s.lower() in resume_text.lower()]
+        if not tech_skills:
+            tech_skills = ["Python"] # Ultimate fallback
+            
     # Determine if JD is provided
     jd_provided = bool(job_description and len(job_description) > 50)
-
+    
+    jd_naive_skills = []
     if jd_provided:
-        # Dummy scoring
+        # Naive JD extraction
+        common_tech = ["Python", "JavaScript", "React", "SQL", "Java", "C++", "AWS", "Docker", "Node.js", "Machine Learning", "Data Analysis", "TypeScript"]
+        jd_naive_skills = [s for s in common_tech if s.lower() in job_description.lower()]
+        
         ats_score = 65
         overall_rating = "Average"
-        matched_skills = ["Python", "JavaScript"]  # just examples
-        missing_skills = ["AWS", "Docker"]
-        strengths = ["Clear work history"]
-        weaknesses = ["Missing cloud skills"]
-        recommendations = ["Add more quantifiable achievements"]
+        # Match based on naive lists
+        matched_skills = [s for s in tech_skills if s.lower() in [j.lower() for j in jd_naive_skills]]
+        missing_skills = [s for s in jd_naive_skills if s.lower() not in [t.lower() for t in tech_skills]]
+        strengths = ["API Connection Failed"]
+        weaknesses = ["Using Fallback Mode"]
+        recommendations = ["Please retry when API rate limits reset"]
         hiring_recommendation = "Consider with training"
     else:
         ats_score = 70
@@ -429,24 +445,22 @@ def fallback_detailed_analysis(resume_text: str, job_description: str, resume_da
             "portfolio": "",
             "summary": "",
             "total_experience_years": 3,
-            "technical_skills": ["Python", "JavaScript", "React"] if jd_provided else ["Python"],
+            "technical_skills": tech_skills,
             "soft_skills": ["Communication", "Teamwork"],
             "education": [{"degree": "B.Sc. Computer Science", "institution": "University", "year": "2020"}],
-            "experience": [
-                {"company": "Tech Corp", "designation": "Developer", "duration": "2021-2023", "description": "Built web apps"}
-            ],
+            "experience": [{"company": "Tech Corp", "designation": "Developer", "duration": "2021-2023", "description": "Built web apps"}],
             "projects": [],
             "certifications": [],
             "achievements": [],
             "languages": ["English"],
-            "keywords": ["Python", "React"]
+            "keywords": tech_skills[:5]
         },
         "ats_analysis": {
             "job_description_provided": jd_provided,
             "ats_score": ats_score,
             "overall_rating": overall_rating,
-            "matching_keywords": ["Python", "JavaScript"] if jd_provided else [],
-            "missing_keywords": ["AWS"] if jd_provided else [],
+            "matching_keywords": matched_skills,
+            "missing_keywords": missing_skills,
             "matched_skills": matched_skills,
             "missing_skills": missing_skills,
             "experience_match_percentage": 60 if jd_provided else 0,
@@ -584,7 +598,12 @@ async def analyze_match_score(
                 json.dump(parsed_jd_final, f, indent=4)
         except Exception as e:
             logger.error(f"Llama JD skill extraction failed: {e}")
-            jd_skills = deduplicate_normalized_list([normalize_technical_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])])
+            # Naive fallback for JD skills
+            jd_skills = deduplicate_normalized_list([normalize_technical_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("matched_skills", [])])
+            if not jd_skills:
+                common_tech = ["Python", "JavaScript", "React", "SQL", "Java", "C++", "AWS", "Docker", "Node.js", "Machine Learning", "Data Analysis"]
+                raw_fallback_skills = [s for s in common_tech if s.lower() in job_description.lower()]
+                jd_skills = deduplicate_normalized_list([normalize_technical_skill(s) for s in raw_fallback_skills])
     else:
         jd_skills = deduplicate_normalized_list([normalize_technical_skill(str(k)) for k in ats.get("missing_skills", []) + ats.get("missing_keywords", [])])
 
@@ -605,9 +624,14 @@ async def analyze_match_score(
             raw_resume_soft_skills = [s for s in parsed_soft if isinstance(s, str)]
 
     # ALWAYS merge the skills from the initial resume parse payload to ensure no skills are dropped during re-parse
-    if payload.resume and payload.resume.skills:
-        payload_skills = [s.name for s in payload.resume.skills if s.name]
-        raw_resume_skills.extend(payload_skills)
+    if payload.resume:
+        if payload.resume.skills:
+            payload_skills = [s.name for s in payload.resume.skills if s.name]
+            raw_resume_skills.extend(payload_skills)
+        if getattr(payload.resume, "technical_skills", None):
+            raw_resume_skills.extend(payload.resume.technical_skills)
+        if getattr(payload.resume, "soft_skills", None):
+            raw_resume_soft_skills.extend(payload.resume.soft_skills)
             
     resume_skills = deduplicate_normalized_list([normalize_technical_skill(s) for s in raw_resume_skills])
     resume_soft_skills = deduplicate_normalized_list([normalize_soft_skill(s) for s in raw_resume_soft_skills])
@@ -622,20 +646,69 @@ async def analyze_match_score(
     if "raw" not in resume_data_parsed:
         resume_data_parsed["raw"] = {k: v for k, v in resume_data_parsed.items() if k not in ("normalized", "raw")}
 
-    # ── Set-difference gap computation ───────────────────────────────────────
+    import uuid
+    from app.core.vector_store import store_skills_in_db, get_semantic_matches
+
+    # ── Store skills in vector DB for persistence and later use ─────────────
+    session_id = uuid.uuid4().hex
+    store_skills_in_db("resume", session_id, resume_skills, resume_soft_skills)
+    store_skills_in_db("jd", session_id, jd_skills, jd_soft_skills)
+
+    # ── Gap computation (Exact + Semantic Vector Matching) ───────────────────
     resume_set = {s.lower() for s in resume_skills}
     jd_lower_map = {s.lower(): s for s in jd_skills}  # lowercase → canonical
-    missing_skills = [jd_lower_map[k] for k in jd_lower_map if k not in resume_set]
-    matched_skills = [jd_lower_map[k] for k in jd_lower_map if k in resume_set]
+    
+    # 1. Exact keyword matches
+    exact_matched_skills = [jd_lower_map[k] for k in jd_lower_map if k in resume_set]
+    missing_skills_initial = [jd_lower_map[k] for k in jd_lower_map if k not in resume_set]
+    
+    # 2. Semantic matches using sentence-transformers and ChromaDB
+    all_resume_tech = resume_skills
+    jd_unmatched_tech = missing_skills_initial
+    
+    semantic_matches = get_semantic_matches(all_resume_tech, jd_unmatched_tech)
+    
+    semantic_matched_resume_skills = []
+    semantic_matched_jd_skills_set = set()
+    
+    for r_skill, jd_skill in semantic_matches:
+        semantic_matched_resume_skills.append(r_skill)
+        semantic_matched_jd_skills_set.add(jd_skill)
+        
+    # Final matched and missing lists for technical skills
+    # The prompt requests displaying the JD's skills collectively in identified strengths
+    matched_skills = exact_matched_skills + list(semantic_matched_jd_skills_set)
+    missing_skills = [s for s in missing_skills_initial if s not in semantic_matched_jd_skills_set]
     
     resume_soft_set = {s.lower() for s in resume_soft_skills}
     jd_soft_lower_map = {s.lower(): s for s in jd_soft_skills}
-    missing_soft_skills = [jd_soft_lower_map[k] for k in jd_soft_lower_map if k not in resume_soft_set]
+    
+    # 1. Exact keyword matches for soft skills
+    missing_soft_skills_initial = [jd_soft_lower_map[k] for k in jd_soft_lower_map if k not in resume_soft_set]
+    
+    # 2. Semantic matches for soft skills
+    all_resume_soft = resume_soft_skills
+    jd_unmatched_soft = missing_soft_skills_initial
+    
+    semantic_soft_matches = get_semantic_matches(all_resume_soft, jd_unmatched_soft)
+    
+    semantic_matched_jd_soft_skills_set = set()
+    for r_skill, jd_skill in semantic_soft_matches:
+        semantic_matched_jd_soft_skills_set.add(jd_skill)
+        
+    missing_soft_skills = [s for s in missing_soft_skills_initial if s not in semantic_matched_jd_soft_skills_set]
 
     # ── Build response structure (using deterministic scoring) ────────────────
     is_ai_powered = not IS_GEMINI_MOCK
 
     if parsed_jd_final:
+        # Inject the semantically matched JD skills back into the resume so the scoring engine gives credit for them
+        if semantic_matched_jd_skills_set:
+            resume_data_parsed["normalized"]["technical_skills"].extend(list(semantic_matched_jd_skills_set))
+            
+        if semantic_matched_jd_soft_skills_set:
+            resume_data_parsed["normalized"]["soft_skills"].extend(list(semantic_matched_jd_soft_skills_set))
+            
         deterministic_ats = calculate_comprehensive_ats_score(resume_data_parsed, parsed_jd_final)
         match_score = deterministic_ats.get("ats_score", 0)
         category_scores_dict = deterministic_ats.get("breakdown", {})

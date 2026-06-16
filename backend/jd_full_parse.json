@@ -1,21 +1,26 @@
 {
     "raw": {
-        "job_title": "Business Analyst Intern",
-        "department": "",
-        "seniority_level": "Intern",
+        "job_title": "IT Support - Other",
+        "department": "IT & Information Security",
+        "seniority_level": "",
         "technical_skills": [
-            "SQL",
-            "AI tools"
+            "Python",
+            "TensorFlow",
+            "PyTorch",
+            "Machine Learning",
+            "Deep Learning",
+            "Generative AI",
+            "Diffusion Models",
+            "MLOps",
+            "Cloud",
+            "Vector DBs",
+            "Artificial Intelligence",
+            "OpenAI",
+            "Hugging Face",
+            "LangChain",
+            "Azure"
         ],
-        "soft_skills": [
-            "Analytical Thinking",
-            "Problem Solving",
-            "Communication",
-            "Presentation",
-            "Attention to detail",
-            "Structured thinking",
-            "Business acumen"
-        ],
+        "soft_skills": [],
         "experience_requirements": {
             "minimum_years": 0,
             "maximum_years": 0,
@@ -24,56 +29,50 @@
         },
         "education_requirements": {
             "required_degrees": [
+                "M.Tech",
                 "B.Tech"
             ],
             "preferred_degrees": [],
-            "required_fields_of_study": [],
+            "required_fields_of_study": [
+                "AI/ML",
+                "Computer Science",
+                "Artificial Intelligence and Machine Learning"
+            ],
             "preferred_fields_of_study": []
         },
         "certification_requirements": {
             "required_certifications": [],
             "preferred_certifications": []
         },
-        "project_requirements": [
-            "Retail analytics",
-            "Business intelligence",
-            "AI"
-        ],
+        "project_requirements": [],
         "responsibilities": [
-            "Analyze business problems",
-            "Extract, clean, and analyze data",
-            "Leverage AI tools",
-            "Identify trends and insights",
-            "Prepare reports and presentations",
-            "Conduct market and competitor research"
+            "Assist in building Generative AI solutions",
+            "Develop and optimize ML/DL models",
+            "Support MLOps pipelines & AI deployments",
+            "Work with cross-functional teams on real-world AI applications"
         ],
         "preferred_skills": [],
-        "keywords": [
-            "Retail Analytics",
-            "Data",
-            "AI",
-            "Business Intelligence"
-        ]
+        "keywords": []
     },
     "normalized": {
         "technical_skills": [
-            "SQL",
-            "AI tools"
-        ],
-        "soft_skills": [
-            "Analytical Thinking",
-            "Problem Solving",
-            "Communication",
-            "Presentation",
-            "Attention To Detail",
-            "Structured Thinking",
-            "Business Acumen"
-        ],
-        "keywords": [
-            "Retail Analytics",
-            "Data",
+            "Python",
+            "TensorFlow",
+            "PyTorch",
+            "Machine Learning",
+            "Deep Learning",
+            "Generative AI",
+            "Diffusion Models",
+            "MLOps",
+            "Cloud",
+            "Vector DBs",
             "Artificial Intelligence",
-            "Business Intelligence"
-        ]
+            "OpenAI",
+            "Hugging Face",
+            "LangChain",
+            "Azure"
+        ],
+        "soft_skills": [],
+        "keywords": []
     }
 }
