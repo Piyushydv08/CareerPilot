@@ -17,7 +17,7 @@ chroma_client = chromadb.PersistentClient(path=CHROMA_DATA_PATH)
 def get_or_create_skills_collection():
     """
     Returns the persistent collection for skills, creating it if it doesn't exist.
-    We use cosine similarity space since we filter by cosine distance <= 0.20 (similarity >= 0.80).
+    We use cosine similarity space since we filter by cosine distance <= 0.30 (similarity >= 0.70).
     """
     collection = chroma_client.get_or_create_collection(
         name="resume_jd_skills",
@@ -57,8 +57,8 @@ def store_skills_in_db(source: str, session_id: str, technical_skills: list[str]
 
 def get_semantic_matches(resume_unmatched_skills: list[str], jd_skills: list[str]) -> list[tuple[str, str]]:
     """
-    Performs fast in-memory semantic matching to find resume skills that match JD skills with >= 0.80 similarity
-    (i.e., cosine distance <= 0.20).
+    Performs fast in-memory semantic matching to find resume skills that match JD skills with >= 0.70 similarity
+    (i.e., cosine distance <= 0.30).
     Returns a list of tuples (resume_skill, matched_jd_skill).
     """
     if not resume_unmatched_skills or not jd_skills:
@@ -78,7 +78,7 @@ def get_semantic_matches(resume_unmatched_skills: list[str], jd_skills: list[str
             best_match_idx = distances[:, j].argmin()
             best_distance = distances[best_match_idx, j]
             
-            if best_distance <= 0.20: # <= 0.20 distance is >= 0.80 similarity
+            if best_distance <= 0.30: # <= 0.30 distance is >= 0.70 similarity
                 matched_resume_skill = resume_unmatched_skills[best_match_idx]
                 semantic_matches.append((matched_resume_skill, jd_skill))
                 

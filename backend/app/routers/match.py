@@ -655,30 +655,21 @@ async def analyze_match_score(
     store_skills_in_db("jd", session_id, jd_skills, jd_soft_skills)
 
     # ── Gap computation (Exact + Semantic Vector Matching) ───────────────────
-    resume_set = {s.lower() for s in resume_skills}
-    jd_lower_map = {s.lower(): s for s in jd_skills}  # lowercase → canonical
+    from app.core.skill_engine.matcher import SkillMatcher
     
-    # 1. Exact keyword matches
-    exact_matched_skills = [jd_lower_map[k] for k in jd_lower_map if k in resume_set]
-    missing_skills_initial = [jd_lower_map[k] for k in jd_lower_map if k not in resume_set]
+    skill_matcher = SkillMatcher()
+    tech_match_result = skill_matcher.match_skills(resume_skills, jd_skills)
     
-    # 2. Semantic matches using sentence-transformers and ChromaDB
-    all_resume_tech = resume_skills
-    jd_unmatched_tech = missing_skills_initial
+    # Map back to lists expected by the rest of the application
+    matched_skills = [m.jd_skill for m in tech_match_result.matched] + [m.jd_skill for m in tech_match_result.semantic_matches]
+    missing_skills = tech_match_result.missing_skills
     
-    semantic_matches = get_semantic_matches(all_resume_tech, jd_unmatched_tech)
-    
-    semantic_matched_resume_skills = []
-    semantic_matched_jd_skills_set = set()
-    
-    for r_skill, jd_skill in semantic_matches:
-        semantic_matched_resume_skills.append(r_skill)
-        semantic_matched_jd_skills_set.add(jd_skill)
-        
-    # Final matched and missing lists for technical skills
-    # The prompt requests displaying the JD's skills collectively in identified strengths
-    matched_skills = exact_matched_skills + list(semantic_matched_jd_skills_set)
-    missing_skills = [s for s in missing_skills_initial if s not in semantic_matched_jd_skills_set]
+    # We maintain this set specifically to inject semantic matches back into the prompt
+    # In the deterministic pipeline, any match that isn't exact is considered an expanded/semantic match that needs injection
+    semantic_matched_jd_skills_set = set(
+        m.jd_skill for m in tech_match_result.matched + tech_match_result.semantic_matches 
+        if m.match_type != "exact"
+    )
     
     resume_soft_set = {s.lower() for s in resume_soft_skills}
     jd_soft_lower_map = {s.lower(): s for s in jd_soft_skills}
@@ -786,13 +777,15 @@ async def analyze_match_score(
         missing_keywords=missing_keywords[:15],
         suggestions=suggestions[:5],
         recommendation_markdown=recommendation_markdown,
-        missing_terms=[],
+        missing_terms=ats.get("missing_terms", []),
         is_ai_powered=is_ai_powered,
         resume_skills=resume_skills,
         jd_skills=jd_skills,
         matched_skills=matched_skills,
         missing_skills=missing_skills,
-        gap_skills=missing_skills,  # backward compat alias
+        missing_soft_skills=missing_soft_skills,
+        gap_skills=missing_skills,  # For backward compatibility
+        technical_skills_breakdown=tech_match_result.model_dump(),
         parsed_resume=resume_data_parsed,
         parsed_jd=parsed_jd_final or {},
     )

@@ -68,6 +68,8 @@ class MatchAnalysisResponse(BaseModel):
     matched_skills: List[str] = Field(default_factory=list)   # jd_skills ∩ resume_skills
     missing_skills: List[str] = Field(default_factory=list)   # jd_skills − resume_skills
     gap_skills: List[str] = Field(default_factory=list)       # Alias of missing_skills (backward compat)
+    missing_soft_skills: List[str] = Field(default_factory=list)
+    technical_skills_breakdown: Optional[dict] = None
     parsed_resume: Dict[str, Any] = Field(default_factory=dict)
     parsed_jd: Dict[str, Any] = Field(default_factory=dict)
 

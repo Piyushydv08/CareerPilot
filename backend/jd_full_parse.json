@@ -10,15 +10,14 @@
             "Machine Learning",
             "Deep Learning",
             "Generative AI",
-            "Diffusion Models",
-            "MLOps",
-            "Cloud",
-            "Vector DBs",
-            "Artificial Intelligence",
             "OpenAI",
             "Hugging Face",
             "LangChain",
-            "Azure"
+            "Azure",
+            "Cloud",
+            "Data Pipelines",
+            "Vector DBs",
+            "MLOps"
         ],
         "soft_skills": [],
         "experience_requirements": {
@@ -29,13 +28,12 @@
         },
         "education_requirements": {
             "required_degrees": [
-                "M.Tech",
-                "B.Tech"
+                "B.Tech",
+                "M.Tech"
             ],
             "preferred_degrees": [],
             "required_fields_of_study": [
-                "AI/ML",
-                "Computer Science",
+                "Computer Science and Engineering",
                 "Artificial Intelligence and Machine Learning"
             ],
             "preferred_fields_of_study": []
@@ -51,7 +49,10 @@
             "Support MLOps pipelines & AI deployments",
             "Work with cross-functional teams on real-world AI applications"
         ],
-        "preferred_skills": [],
+        "preferred_skills": [
+            "Artificial Intelligence",
+            "AI solutions"
+        ],
         "keywords": []
     },
     "normalized": {
@@ -62,15 +63,14 @@
             "Machine Learning",
             "Deep Learning",
             "Generative AI",
-            "Diffusion Models",
-            "MLOps",
-            "Cloud",
-            "Vector DBs",
-            "Artificial Intelligence",
             "OpenAI",
             "Hugging Face",
             "LangChain",
-            "Azure"
+            "Azure",
+            "Cloud",
+            "Data Pipelines",
+            "Vector DBs",
+            "MLOps"
         ],
         "soft_skills": [],
         "keywords": []

@@ -1,0 +1,238 @@
+{
+    "pytorch": [
+        "deep learning"
+    ],
+    "tensorflow": [
+        "deep learning"
+    ],
+    "scikit-learn": [
+        "machine learning"
+    ],
+    "matplotlib": [
+        "data visualization",
+        "data analysis"
+    ],
+    "seaborn": [
+        "data visualization",
+        "data analysis"
+    ],
+    "plotly": [
+        "data visualization"
+    ],
+    "postgresql": [
+        "sql",
+        "database"
+    ],
+    "mysql": [
+        "sql",
+        "database"
+    ],
+    "fastapi": [
+        "backend development",
+        "api development"
+    ],
+    "django": [
+        "backend development"
+    ],
+    "flask": [
+        "backend development"
+    ],
+    "pandas": [
+        "data analysis",
+        "data manipulation"
+    ],
+    "numpy": [
+        "data analysis",
+        "numerical computation"
+    ],
+    "nltk": [
+        "natural language processing"
+    ],
+    "spacy": [
+        "natural language processing"
+    ],
+    "transformers": [
+        "natural language processing"
+    ],
+    "bert": [
+        "natural language processing"
+    ],
+    "gpt": [
+        "natural language processing"
+    ],
+    "sentence transformers": [
+        "natural language processing"
+    ],
+    "langchain": [
+        "generative ai"
+    ],
+    "llamaindex": [
+        "natural language processing",
+        "generative ai"
+    ],
+    "opencv": [
+        "computer vision"
+    ],
+    "yolo": [
+        "computer vision"
+    ],
+    "detectron2": [
+        "computer vision"
+    ],
+    "mmdetection": [
+        "computer vision"
+    ],
+    "pillow": [
+        "computer vision"
+    ],
+    "albumentations": [
+        "computer vision"
+    ],
+    "apache spark": [
+        "data engineering"
+    ],
+    "pyspark": [
+        "data engineering"
+    ],
+    "apache kafka": [
+        "data engineering"
+    ],
+    "apache airflow": [
+        "data engineering"
+    ],
+    "apache beam": [
+        "data engineering"
+    ],
+    "databricks": [
+        "data engineering"
+    ],
+    "snowflake": [
+        "data engineering"
+    ],
+    "dbt": [
+        "data engineering"
+    ],
+    "hadoop": [
+        "big data"
+    ],
+    "hive": [
+        "big data"
+    ],
+    "hbase": [
+        "big data"
+    ],
+    "spark": [
+        "big data"
+    ],
+    "kafka": [
+        "big data"
+    ],
+    "spring boot": [
+        "backend development"
+    ],
+    "express.js": [
+        "backend development"
+    ],
+    "nestjs": [
+        "backend development"
+    ],
+    "asp.net": [
+        "backend development"
+    ],
+    "aws": [
+        "cloud computing"
+    ],
+    "azure": [
+        "cloud computing"
+    ],
+    "google cloud": [
+        "cloud computing"
+    ],
+    "lambda": [
+        "cloud computing"
+    ],
+    "ec2": [
+        "cloud computing"
+    ],
+    "s3": [
+        "cloud computing"
+    ],
+    "cloud run": [
+        "cloud computing"
+    ],
+    "react": [
+        "frontend development"
+    ],
+    "angular": [
+        "frontend development"
+    ],
+    "vue.js": [
+        "frontend development"
+    ],
+    "next.js": [
+        "frontend development"
+    ],
+    "nuxt.js": [
+        "frontend development"
+    ],
+    "bootstrap": [
+        "frontend development"
+    ],
+    "tailwind css": [
+        "frontend development"
+    ],
+    "mlflow": [
+        "mlops"
+    ],
+    "kubeflow": [
+        "mlops"
+    ],
+    "sagemaker": [
+        "mlops"
+    ],
+    "weights & biases": [
+        "mlops"
+    ],
+    "dvc": [
+        "mlops"
+    ],
+    "airflow": [
+        "mlops"
+    ],
+    "openai api": [
+        "generative ai"
+    ],
+    "gpt-4": [
+        "generative ai"
+    ],
+    "claude": [
+        "generative ai"
+    ],
+    "gemini": [
+        "generative ai"
+    ],
+    "llama": [
+        "generative ai"
+    ],
+    "rag": [
+        "generative ai"
+    ],
+    "vector databases": [
+        "generative ai"
+    ],
+    "faiss": [
+        "vector databases"
+    ],
+    "chroma": [
+        "vector databases"
+    ],
+    "pinecone": [
+        "vector databases"
+    ],
+    "weaviate": [
+        "vector databases"
+    ],
+    "milvus": [
+        "vector databases"
+    ]
+}
