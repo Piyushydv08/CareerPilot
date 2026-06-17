@@ -3,10 +3,10 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Bell, 
-  User, 
-  Activity, 
+import {
+  Bell,
+  User,
+  Activity,
   Terminal,
   Search,
   CheckCircle2,
@@ -17,7 +17,7 @@ import { useProject } from "../app/context/ProjectContext";
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
-  const { matchScore } = useProject();
+  const { matchScore, resumeData } = useProject();
   const [searchQuery, setSearchQuery] = useState("");
 
   // Map route path to professional telemetry titles
@@ -46,7 +46,7 @@ export const Header: React.FC = () => {
       {/* Global Actions */}
       <div className="flex items-center gap-6">
         {/* Analyze Resume Quick Route */}
-        <Link 
+        <Link
           href="/analyze"
           className="flex items-center gap-1.5 rounded border border-cyber-blue/30 bg-cyber-blue/5 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-wider text-cyber-blue hover:bg-cyber-blue hover:text-black hover:shadow-[0_0_10px_rgba(0,210,255,0.4)] transition-all duration-200"
         >
@@ -55,7 +55,7 @@ export const Header: React.FC = () => {
         </Link>
 
         {/* Jobs Quick Route */}
-        <Link 
+        <Link
           href="/outreach"
           className="flex items-center gap-1.5 rounded border border-outline-variant bg-surface-container px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-on-surface hover:border-cyber-blue/40 hover:text-cyber-blue transition-all duration-200"
         >
@@ -63,14 +63,7 @@ export const Header: React.FC = () => {
           <span>Outbound Req</span>
         </Link>
 
-        {/* Separator */}
-        <div className="h-5 w-px bg-outline-variant"></div>
 
-        {/* Notification Alert Bell */}
-        <button className="relative text-on-surface-variant hover:text-cyber-blue transition-colors focus:outline-none">
-          <Bell className="h-4.5 w-4.5" />
-          <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-cyber-blue shadow-[0_0_6px_rgba(0,210,255,0.8)] animate-pulse"></span>
-        </button>
 
         {/* User Account Portal */}
         <div className="flex items-center gap-2 border-l border-outline-variant/60 pl-4">
@@ -79,7 +72,7 @@ export const Header: React.FC = () => {
           </div>
           <div className="hidden xl:block text-left">
             <div className="font-mono text-[11px] font-medium leading-none text-white">piyus_01</div>
-            <span className="font-mono text-[9px] text-[#00d2ff]/80">ATS Score: {matchScore}%</span>
+            <span className="font-mono text-[9px] text-[#00d2ff]/80">ATS Score: {resumeData ? `${matchScore}%` : "N/A"}</span>
           </div>
         </div>
       </div>
