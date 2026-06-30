@@ -25,6 +25,7 @@ async def get_top_fresher_jobs():
     \"\"\"
     Uses Gemini API to fetch top 10 jobs for freshers in 2026 after BTech.
     \"\"\"
+    response = None
     try:
         client = get_gemini_client()
         prompt = \"\"\"Provide the top 10 jobs for freshers in 2026 after just completing a BTech degree. 
@@ -52,7 +53,8 @@ async def get_top_fresher_jobs():
         return {"jobs": jobs_data}
         
     except json.JSONDecodeError:
-        logger.error(f"Failed to parse Gemini response as JSON: {response.text}")
+        response_text = response.text if response is not None else "No response generated"
+        logger.error(f"Failed to parse Gemini response as JSON: {response_text}")
         raise HTTPException(status_code=500, detail="Failed to parse response from AI.")
     except Exception as e:
         logger.error(f"Gemini API error: {e}")

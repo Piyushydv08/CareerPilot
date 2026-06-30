@@ -3,14 +3,20 @@ import logging
 import importlib
 from importlib.util import find_spec
 from collections import Counter
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 from fastapi import APIRouter, HTTPException, Query
 import httpx
 import pandas as pd
 from google import genai
+# pyrefly: ignore [missing-import]
 from google.genai import types
 import json
+
+from app.models.schemas import (
+    TrendAnalyticsResponse, DemandSkillItem, SalaryDistributionItem,
+    CompanyDataItem, HistoricalSalaryItem, CategoryItem, JobsworthItem
+)
+from app.core.config import settings
 
 def get_gemini_client() -> genai.Client:
     api_key = os.getenv("GEMINI_API_KEY", "")
@@ -20,12 +26,6 @@ def get_gemini_client() -> genai.Client:
 
 
 spacy = importlib.import_module("spacy") if find_spec("spacy") else None
-
-from app.models.schemas import (
-    TrendAnalyticsResponse, DemandSkillItem, SalaryDistributionItem,
-    CompanyDataItem, HistoricalSalaryItem, CategoryItem, JobsworthItem
-)
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -710,6 +710,8 @@ async def get_top_fresher_jobs():
     """
     Uses Gemini API to fetch top 10 jobs for freshers in 2026 after BTech.
     """
+    response = None
+    response_text = ""
     try:
         client = get_gemini_client()
         prompt = """Provide the top 10 jobs for freshers in 2026 after just completing a BTech degree. 
@@ -738,11 +740,14 @@ async def get_top_fresher_jobs():
         if not response.text:
             raise HTTPException(status_code=500, detail="Empty response from Gemini API.")
             
-        data = json.loads(response.text)
+        response_text = response.text
+        data = json.loads(response_text)
         return {"jobs": data.get("jobs", []), "skills": data.get("skills", [])}
         
     except json.JSONDecodeError:
-        logger.error(f"Failed to parse Gemini response as JSON: {response.text}")
+        if not response_text:
+            response_text = response.text if response is not None else "No response generated"
+        logger.error(f"Failed to parse Gemini response as JSON: {response_text}")
         raise HTTPException(status_code=500, detail="Failed to parse response from AI.")
     except Exception as e:
         logger.error(f"Gemini API error: {e}")

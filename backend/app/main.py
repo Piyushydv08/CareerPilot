@@ -75,10 +75,20 @@ async def catch_global_exceptions_middleware(request: Request, call_next):
         logger.error(f"Global server execution crash occurred on {request.url.path}: {exc}")
         # Print actual console traceback stack safely
         traceback.print_exc()
-        return JSONResponse(
+        error_response = JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"detail": "Internal server execution error. Telemetry protection active."}
         )
+        
+        # Attach permissive CORS headers to the 500 error response so the browser doesn't throw a generic "Failed to fetch"
+        origin = request.headers.get("origin")
+        if origin:
+            error_response.headers["Access-Control-Allow-Origin"] = origin
+            error_response.headers["Access-Control-Allow-Credentials"] = "true"
+        else:
+            error_response.headers["Access-Control-Allow-Origin"] = "*"
+            
+        return error_response
 
 # --- Route inclusions under /api/v1 prefix ---
 app.include_router(resume.router, prefix=settings.API_V1_STR)

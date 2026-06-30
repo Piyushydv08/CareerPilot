@@ -1,79 +1,100 @@
 {
     "raw": {
-        "job_title": "Business Analyst Intern",
+        "job_title": "Full Stack Developer",
         "department": "",
-        "seniority_level": "Intern",
+        "seniority_level": "",
         "technical_skills": [
-            "SQL",
-            "AI tools"
+            "Python",
+            "TensorFlow",
+            "PyTorch",
+            "Machine Learning",
+            "Deep Learning",
+            "Generative AI",
+            "Diffusion Models",
+            "MLOps",
+            "Cloud",
+            "Vector DBs",
+            "Artificial Intelligence",
+            "OpenAI",
+            "Hugging Face",
+            "LangChain",
+            "Azure"
         ],
-        "soft_skills": [
-            "Analytical Thinking",
-            "Problem Solving",
-            "Communication",
-            "Presentation",
-            "Attention to detail",
-            "Structured thinking",
-            "Business acumen"
-        ],
+        "soft_skills": [],
         "experience_requirements": {
-            "minimum_years": 0,
+            "minimum_years": 2,
             "maximum_years": 0,
-            "required_domains": [],
-            "preferred_domains": []
+            "required_domains": [
+                "Software Development",
+                "Web Development"
+            ],
+            "preferred_domains": [
+                "Cloud Computing",
+                "DevOps"
+            ]
         },
         "education_requirements": {
             "required_degrees": [
+                "M.Tech",
                 "B.Tech"
             ],
-            "preferred_degrees": [],
-            "required_fields_of_study": [],
-            "preferred_fields_of_study": []
+            "preferred_degrees": [
+                "Master's Degree"
+            ],
+            "required_fields_of_study": [
+                "AI/ML",
+                "Computer Science",
+                "Artificial Intelligence and Machine Learning"
+            ],
+            "preferred_fields_of_study": [
+                "Software Engineering"
+            ]
         },
         "certification_requirements": {
             "required_certifications": [],
-            "preferred_certifications": []
+            "preferred_certifications": [
+                "Certified Scrum Master",
+                "Certified Full Stack Developer"
+            ]
         },
         "project_requirements": [
-            "Retail analytics",
-            "Business intelligence",
-            "AI"
+            "Web Application Development",
+            "Mobile Application Development"
         ],
         "responsibilities": [
-            "Analyze business problems",
-            "Extract, clean, and analyze data",
-            "Leverage AI tools",
-            "Identify trends and insights",
-            "Prepare reports and presentations",
-            "Conduct market and competitor research"
+            "Design and Development",
+            "Testing and Debugging",
+            "Collaboration with Cross-Functional Teams"
         ],
-        "preferred_skills": [],
-        "keywords": [
-            "Retail Analytics",
-            "Data",
-            "AI",
-            "Business Intelligence"
-        ]
+        "preferred_skills": [
+            "Cloud Platforms",
+            "Containerization",
+            "Microservices Architecture"
+        ],
+        "keywords": []
     },
     "normalized": {
         "technical_skills": [
-            "SQL",
-            "AI tools"
-        ],
-        "soft_skills": [
-            "Analytical Thinking",
-            "Problem Solving",
-            "Communication",
-            "Presentation",
-            "Attention To Detail",
-            "Structured Thinking",
-            "Business Acumen"
+            "Python",
+            "TensorFlow",
+            "PyTorch",
+            "Machine Learning",
+            "Deep Learning",
+            "Generative AI",
+            "Diffusion Models",
+            "MLOps",
+            "Cloud",
+            "Vector DBs",
+            "Artificial Intelligence",
+            "OpenAI",
+            "Hugging Face",
+            "LangChain",
+            "Azure"
         ],
         "keywords": [
-            "Retail Analytics",
-            "Data",
-            "Artificial Intelligence",
-            "Business Intelligence"
+            "Full Stack Development",
+            "Web Development",
+            "Software Development"
         ]
     }
 }

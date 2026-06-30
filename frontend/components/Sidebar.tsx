@@ -3,13 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  Cpu, 
-  BrainCircuit, 
-  MessageSquareCode, 
-  SendHorizontal, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Cpu,
+  BrainCircuit,
+  MessageSquareCode,
+  SendHorizontal,
+  Info,
   HelpCircle,
   Sparkles,
   Compass,
@@ -51,15 +51,13 @@ export const Sidebar: React.FC = () => {
             <Link
               key={item.name}
               href={item.href}
-              className={`group flex items-center gap-3 rounded-md px-3 py-2.5 font-mono text-xs uppercase tracking-wider transition-all duration-200 ${
-                isActive
+              className={`group flex items-center gap-3 rounded-md px-3 py-2.5 font-mono text-xs uppercase tracking-wider transition-all duration-200 ${isActive
                   ? "bg-cyber-blue/10 text-cyber-blue border-r-2 border-cyber-blue shadow-[inset_0_0_10px_rgba(0,210,255,0.05)] font-bold scale-[0.98]"
                   : "text-on-surface-variant hover:bg-surface-container hover:text-white"
-              }`}
+                }`}
             >
-              <Icon className={`h-4.5 w-4.5 transition-transform duration-300 group-hover:scale-110 ${
-                isActive ? "text-cyber-blue" : "text-on-surface-variant group-hover:text-cyber-blue"
-              }`} />
+              <Icon className={`h-4.5 w-4.5 transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-cyber-blue" : "text-on-surface-variant group-hover:text-cyber-blue"
+                }`} />
               <span>{item.name}</span>
             </Link>
           );
@@ -81,11 +79,12 @@ export const Sidebar: React.FC = () => {
       {/* Footer Nav */}
       <div className="space-y-1 border-t border-outline-variant/50 pt-4">
         <Link
-          href="/settings"
-          className="flex items-center gap-3 rounded-md px-3 py-2 font-mono text-[11px] text-on-surface-variant transition-all hover:bg-surface-container hover:text-white"
+          href="/about"
+          className={`flex items-center gap-3 rounded-md px-3 py-2 font-mono text-[11px] transition-all hover:bg-surface-container hover:text-white ${pathname.startsWith("/about") ? "text-cyber-blue font-semibold bg-cyber-blue/5 border-r border-cyber-blue" : "text-on-surface-variant"
+            }`}
         >
-          <Settings className="h-4 w-4" />
-          <span>Settings</span>
+          <Info className="h-4 w-4" />
+          <span>About</span>
         </Link>
         <Link
           href="/support"

@@ -26,6 +26,8 @@ class ResumeDataSchema(BaseModel):
     gaps: List[SkillGapSchema]
     ats_score: Optional[int] = 0
     raw_text: Optional[str] = None  # Full extracted resume text for ATS analysis
+    technical_skills: List[str] = Field(default_factory=list)
+    soft_skills: List[str] = Field(default_factory=list)
 
 # --- Cover Letter Models ---
 class CoverLetterRequest(BaseModel):
@@ -66,6 +68,8 @@ class MatchAnalysisResponse(BaseModel):
     matched_skills: List[str] = Field(default_factory=list)   # jd_skills ∩ resume_skills
     missing_skills: List[str] = Field(default_factory=list)   # jd_skills − resume_skills
     gap_skills: List[str] = Field(default_factory=list)       # Alias of missing_skills (backward compat)
+    missing_soft_skills: List[str] = Field(default_factory=list)
+    technical_skills_breakdown: Optional[dict] = None
     parsed_resume: Dict[str, Any] = Field(default_factory=dict)
     parsed_jd: Dict[str, Any] = Field(default_factory=dict)
 

@@ -48,15 +48,15 @@
                     "description": "Gained exposure to accounting and finance operations within a large-scale manufacturing organization, developing an understanding of corporate reporting, financial workflows and the role of finance. Acquired familiarity with SAP ERP and its application in integrating finance, procurement and inventory functions.",
                     "skills_used": [
                         "SAP ERP",
-                        "Financial workflows",
-                        "Corporate reporting"
+                        "Financial Workflows",
+                        "Corporate Reporting"
                     ]
                 }
             ]
         },
         "education": [
             {
-                "degree": "Bachelor of Technology",
+                "degree": "B.Tech. ICE",
                 "field_of_study": "Instrumentation And Control Engineering",
                 "institution": "Netaji Subhas University of Technology",
                 "year": "2023-2027"
@@ -64,13 +64,13 @@
             {
                 "degree": "Class XII",
                 "field_of_study": "",
-                "institution": "Shiv Jyoti Senior Secondary School",
+                "institution": "Shiv Jyoti Senior Secondary School, India",
                 "year": "2023"
             },
             {
                 "degree": "Class X",
                 "field_of_study": "",
-                "institution": "Saint Pauls School",
+                "institution": "Saint Pauls School, India",
                 "year": "2021"
             }
         ],
@@ -119,15 +119,16 @@
         ],
         "keywords": [
             "Python",
-            "NLP",
             "Machine Learning",
-            "Data Analytics",
+            "Data Analysis",
             "SQL",
-            "Excel",
-            "Data Visualization",
-            "SAP ERP",
-            "Financial workflows",
-            "Corporate reporting"
+            "NLP",
+            "Generative AI",
+            "LLM APIs",
+            "Resume Parsing",
+            "Scikit-learn",
+            "Streamlit",
+            "TMDB API"
         ]
     },
     "normalized": {
@@ -163,15 +164,16 @@
         ],
         "keywords": [
             "Python",
-            "Natural Language Processing",
             "Machine Learning",
-            "Data Analytics",
+            "Data Analysis",
             "Sql",
-            "Excel",
-            "Data Visualization",
-            "Sap Erp",
-            "Financial Workflows",
-            "Corporate Reporting"
+            "Natural Language Processing",
+            "Generative Ai",
+            "Llm Apis",
+            "Resume Parsing",
+            "Scikit-Learn",
+            "Streamlit",
+            "Tmdb Api"
         ],
         "certifications": [],
         "project_domains": [
@@ -180,7 +182,7 @@
             "Machine Learning And Artifical Intelligence"
         ],
         "education_degrees": [
-            "Bachelor of Technology",
+            "B.Tech. Ice",
             "Class Xii",
             "Class X"
         ],

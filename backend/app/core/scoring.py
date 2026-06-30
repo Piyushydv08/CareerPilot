@@ -31,10 +31,19 @@ def calculate_skills_match(resume_tech: list, resume_soft: list, jd_tech: list, 
     return (tech_match * 0.8) + (soft_match * 0.2)
 
 
-def calculate_experience_match(resume_exp_data: dict, jd_exp_data: dict) -> float:
+def calculate_experience_match(resume_exp_data, jd_exp_data: dict) -> float:
     # A: Years Match
     req_years = jd_exp_data.get("minimum_years", 0)
-    resume_years = resume_exp_data.get("total_years", 0)
+    
+    if isinstance(resume_exp_data, dict):
+        resume_years = resume_exp_data.get("total_years", 0)
+        resume_roles = resume_exp_data.get("roles", [])
+    elif isinstance(resume_exp_data, list):
+        resume_years = len(resume_exp_data) * 1.0  # Simple fallback
+        resume_roles = resume_exp_data
+    else:
+        resume_years = 0
+        resume_roles = []
     
     if req_years <= 0:
         years_match = 100.0
@@ -43,7 +52,6 @@ def calculate_experience_match(resume_exp_data: dict, jd_exp_data: dict) -> floa
 
     # B: Domain Match
     req_domains = [normalize_project_domain(d) for d in jd_exp_data.get("required_domains", []) if d]
-    resume_roles = resume_exp_data.get("roles", [])
     # Extract domains implicitly from role titles or descriptions if not explicitly present
     # Using job titles as a proxy for domains here.
     resume_domains = deduplicate_normalized_list([normalize_project_domain(r.get("designation", "")) for r in resume_roles])
@@ -173,7 +181,13 @@ def calculate_resume_quality_v2(resume_data: dict) -> float:
         score += 10
 
     # 5. Experience (20)
-    roles = raw_resume.get("experience", {}).get("roles", [])
+    exp_data = raw_resume.get("experience", {})
+    if isinstance(exp_data, dict):
+        roles = exp_data.get("roles", [])
+    elif isinstance(exp_data, list):
+        roles = exp_data
+    else:
+        roles = []
     if len(roles) >= 2:
         score += 20
     elif len(roles) == 1:

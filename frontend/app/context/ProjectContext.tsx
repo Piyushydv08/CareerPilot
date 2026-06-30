@@ -19,6 +19,8 @@ export interface ResumeData {
   gaps: SkillGap[];
   ats_score?: number;
   raw_text?: string; // Full extracted resume text for ATS analysis
+  technical_skills?: string[];
+  soft_skills?: string[];
 }
 
 export interface ATSCategoryScores {
